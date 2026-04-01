@@ -467,8 +467,8 @@ def open_lease_details(parent, lease_id, current_user=None):
         if not cur.fetchall():
             styled_label(payments_frame, "No payments recorded yet", foreground=COLOR_WARNING).pack(pady=20)
     
-    # Close button
-    ttk.Button(dlg, text="Close", command=dlg.destroy).pack(pady=10)
+    # Close button - use make_button for consistency
+    make_button(dlg, "Close", command=dlg.destroy, kind="secondary").pack(pady=10)
 
 
 def open_record_payment_dialog(parent, lease_id, current_user=None):

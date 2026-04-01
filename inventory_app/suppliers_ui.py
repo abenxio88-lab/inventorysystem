@@ -478,8 +478,8 @@ def open_supplier_products(parent, supplier_id):
                 f"Rs. {row['selling_price']:,.2f}"
             ))
     
-    # Close button
-    ttk.Button(dlg, text="Close", command=dlg.destroy).pack(pady=10)
+    # Close button with uniform styling
+    make_button(dlg, text="Close", command=dlg.destroy, kind="secondary").pack(pady=10)
 
 
 def get_suppliers_list():

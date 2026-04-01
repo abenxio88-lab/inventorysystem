@@ -255,14 +255,18 @@ class PremiumPopup(tk.Toplevel):
                     command=btn_config.get("command", lambda: None),
                     kind=btn_config.get("kind", "primary"),
                     icon=btn_config.get("icon", ""),
-                    uniform=use_uniform
+                    uniform=True
                 )
             else:
+                # Fallback: create styled button with uniform width
+                btn_width = 14  # Standard character width
                 btn = ttk.Button(
                     button_frame, 
                     text=btn_config.get("text", "Action"),
                     command=btn_config.get("command", lambda: None),
-                    style=btn_config.get("style", "Accent.TButton")
+                    style=btn_config.get("style", "TButton"),
+                    width=btn_width,
+                    padding=(20, 12)
                 )
             btn.pack(side="left", padx=5, expand=False, fill="x")
             

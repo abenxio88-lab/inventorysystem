@@ -529,8 +529,8 @@ def open_return_details(parent, return_id, current_user=None):
                 f"Rs. {row['line_total']:,.2f}"
             ))
     
-    # Close button
-    ttk.Button(dlg, text="Close", command=dlg.destroy).pack(pady=10)
+    # Close button - use make_button for consistency
+    make_button(dlg, "Close", command=dlg.destroy, kind="secondary").pack(pady=10)
 
 
 def approve_return(return_id):

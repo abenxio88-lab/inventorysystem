@@ -482,8 +482,8 @@ def open_transfer_details(parent, transfer_id):
                 row['received_quantity'] or 0
             ))
     
-    # Close button
-    ttk.Button(dlg, text="Close", command=dlg.destroy).pack(pady=10)
+    # Close button with uniform styling
+    make_button(dlg, text="Close", command=dlg.destroy, kind="secondary").pack(pady=10)
 
 
 def complete_transfer(transfer_id):

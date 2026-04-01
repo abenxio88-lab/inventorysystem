@@ -433,8 +433,8 @@ def open_device_details(parent, serial_id):
             styled_label(frame, f"{label}", font=("Segoe UI", 10, "bold"), width=12).pack(side=tk.LEFT)
             styled_label(frame, f"{value}").pack(side=tk.LEFT)
     
-    # Close button
-    ttk.Button(dlg, text="Close", command=dlg.destroy).pack(pady=15)
+    # Close button with uniform styling
+    make_button(dlg, "Close", command=dlg.destroy, kind="secondary").pack(pady=15)
 
 
 def open_mark_sold_dialog(parent, serial_id):

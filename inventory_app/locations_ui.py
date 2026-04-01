@@ -437,8 +437,8 @@ def open_location_stock_viewer(parent, location_id):
                 row['rack_location'] or 'N/A'
             ))
     
-    # Close button
-    ttk.Button(dlg, text="Close", command=dlg.destroy).pack(pady=10)
+    # Close button - use make_button for consistency
+    make_button(dlg, "Close", command=dlg.destroy, kind="secondary").pack(pady=10)
 
 
 def get_locations_list():

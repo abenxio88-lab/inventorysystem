@@ -8,6 +8,12 @@ import tkinter as tk
 from tkinter import ttk
 
 try:
+    from ui_theme import make_button
+    HAS_UI_THEME = True
+except ImportError:
+    HAS_UI_THEME = False
+
+try:
     from .network import get_connectivity_monitor
     from .sync_engine import get_pending_sync_count
 except (ImportError, ModuleNotFoundError):
@@ -73,22 +79,42 @@ class ConnectionStatusWidget(ttk.Frame):
         )
         self.last_sync_label.pack(side=tk.LEFT, padx=10)
         
-        # Manual sync button
-        self.sync_button = ttk.Button(
-            self,
-            text="🔄 Sync Now",
-            command=self._on_sync_click,
-            width=12
-        )
+        # Manual sync button with uniform styling
+        if HAS_UI_THEME:
+            self.sync_button = make_button(
+                self,
+                text="🔄 Sync Now",
+                command=self._on_sync_click,
+                kind="info",
+                uniform=True
+            )
+        else:
+            self.sync_button = ttk.Button(
+                self,
+                text="🔄 Sync Now",
+                command=self._on_sync_click,
+                width=14,
+                padding=(20, 12)
+            )
         self.sync_button.pack(side=tk.RIGHT, padx=5)
         
-        # Status info button
-        self.info_button = ttk.Button(
-            self,
-            text="ℹ️",
-            command=self._show_status_info,
-            width=3
-        )
+        # Status info button with uniform styling
+        if HAS_UI_THEME:
+            self.info_button = make_button(
+                self,
+                text="ℹ️",
+                command=self._show_status_info,
+                kind="secondary",
+                uniform=True
+            )
+        else:
+            self.info_button = ttk.Button(
+                self,
+                text="ℹ️",
+                command=self._show_status_info,
+                width=3,
+                padding=(20, 12)
+            )
         self.info_button.pack(side=tk.RIGHT)
     
     def _start_monitoring(self):
@@ -209,12 +235,23 @@ class ConnectionStatusWidget(ttk.Frame):
                 justify=tk.LEFT
             ).pack(anchor=tk.W)
         
-        # Close button
-        ttk.Button(
-            content,
-            text="Close",
-            command=info_window.destroy
-        ).pack(pady=(20, 0))
+        # Close button with uniform styling
+        if HAS_UI_THEME:
+            make_button(
+                content,
+                text="Close",
+                command=info_window.destroy,
+                kind="secondary",
+                uniform=True
+            ).pack(pady=(20, 0))
+        else:
+            ttk.Button(
+                content,
+                text="Close",
+                command=info_window.destroy,
+                width=14,
+                padding=(20, 12)
+            ).pack(pady=(20, 0))
 
 
 class StatusBar(ttk.Frame):
