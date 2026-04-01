@@ -7,7 +7,8 @@ try:
         FONT_BOLD, COLOR_PRIMARY, COLOR_TEXT_MAIN, COLOR_BORDER,
         SUBHEADING_FONT, FONT_SMALL, create_divider, make_button,
         COLOR_SUCCESS, COLOR_DANGER, COLOR_WARNING, COLOR_INFO,
-        SPACING_DEFAULT, SPACING_LARGE
+        SPACING_DEFAULT, SPACING_LARGE, get_color, toggle_theme, get_current_theme,
+        make_glass_card, create_badge
     )
 except (ImportError, ModuleNotFoundError):
     from ui_theme import (
@@ -15,7 +16,8 @@ except (ImportError, ModuleNotFoundError):
         FONT_BOLD, COLOR_PRIMARY, COLOR_TEXT_MAIN, COLOR_BORDER,
         SUBHEADING_FONT, FONT_SMALL, create_divider, make_button,
         COLOR_SUCCESS, COLOR_DANGER, COLOR_WARNING, COLOR_INFO,
-        SPACING_DEFAULT, SPACING_LARGE
+        SPACING_DEFAULT, SPACING_LARGE, get_color, toggle_theme, get_current_theme,
+        make_glass_card, create_badge
     )
 
 try:
@@ -45,6 +47,42 @@ except (ImportError, ModuleNotFoundError):
     except: load_sales = lambda: []
 
 from tkinter import simpledialog, messagebox
+
+# Industry configurations with icons and descriptions
+INDUSTRY_CONFIGS = {
+    "Retail": {
+        "icon": "🛒",
+        "color": "#2563EB",
+        "description": "Complete retail management with POS, inventory tracking, and customer loyalty programs.",
+        "features": ["Point of Sale", "Inventory Management", "Customer Analytics", "Multi-store Support"]
+    },
+    "Pharma": {
+        "icon": "💊",
+        "color": "#10B981",
+        "description": "Pharmaceutical compliance with batch tracking, expiry alerts, and prescription management.",
+        "features": ["Batch Tracking", "Expiry Alerts", "Prescription Mgmt", "Regulatory Compliance"]
+    },
+    "Electronics": {
+        "icon": "📱",
+        "color": "#8B5CF6",
+        "description": "Electronics-specific features including IMEI tracking, warranty management, and repair services.",
+        "features": ["IMEI/Serial Tracking", "Warranty Mgmt", "Repair Services", "Trade-in Program"]
+    },
+    "Manufacturing": {
+        "icon": "🏭",
+        "color": "#F59E0B",
+        "description": "Manufacturing operations with BOM management, production tracking, and supply chain optimization.",
+        "features": ["BOM Management", "Production Tracking", "Supply Chain", "Quality Control"]
+    },
+    "Healthcare": {
+        "icon": "🏥",
+        "color": "#EF4444",
+        "description": "Healthcare inventory with medical device tracking, patient billing, and insurance integration.",
+        "features": ["Device Tracking", "Patient Billing", "Insurance Integration", "HIPAA Compliance"]
+    }
+}
+
+DEFAULT_INDUSTRY = "Retail"
 
 def create_dashboard_tab(parent, username, role, switch_tab_callback=None):
     """
