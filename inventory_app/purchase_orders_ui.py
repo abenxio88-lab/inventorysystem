@@ -258,100 +258,124 @@ def create_purchase_orders_tab(parent, current_user=None):
 
 
 def open_create_po_dialog(parent, current_user=None):
-    """Dialog to create a new purchase order."""
-    dlg = tk.Toplevel(parent)
-    dlg.title("Create Purchase Order")
-    dlg.geometry("750x650")
-    dlg.resizable(False, False)
-    dlg.transient(parent)
-    dlg.grab_set()
+    """Premium dialog to create a new purchase order with proper sizing and scrolling."""
+    from app_core import PremiumPopup, app_state, data_linker
     
-    content = ttk.Frame(dlg, padding=20)
-    content.pack(fill=tk.BOTH, expand=True)
+    dlg = PremiumPopup(parent, "Create Purchase Order", width=850, height=700, resizable=True)
+    content = dlg.get_content_frame()
     
-    # Heading
-    styled_label(content, "New Purchase Order", font=FONT_BOLD).pack(anchor=tk.W, pady=(0, 15))
+    # Header with industry context
+    header_card = make_card(content, padx=30, pady=20)
+    header_card.pack(fill="x", pady=(20, 15))
     
-    # Supplier selection
-    supplier_frame = ttk.Frame(content)
-    supplier_frame.pack(fill=tk.X, pady=(0, 15))
+    industry_config = app_state.get_industry_config()
+    header_title = styled_label(header_card, f"📦 {industry_config['icon']} New Purchase Order", 
+                                font=FONT_BOLD, foreground=COLOR_PRIMARY)
+    header_title.pack()
     
-    styled_label(supplier_frame, "Supplier *:", font=FONT_BOLD).grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
+    if industry_config['features']:
+        features_text = " • ".join(industry_config['features'])
+        features_label = styled_label(header_card, features_text, 
+                                     font=("Segoe UI", 9), foreground="#6c757d")
+        features_label.pack(pady=(5, 0))
+    
+    # Main form card
+    form_card = make_card(content, padding=20)
+    form_card.pack(fill="both", expand=True, pady=(0, 15))
+    
+    # Supplier selection row
+    supplier_row = ttk.Frame(form_card)
+    supplier_row.pack(fill="x", pady=(0, 15))
+    
+    styled_label(supplier_row, "Supplier *:", font=FONT_BOLD).grid(row=0, column=0, sticky="w", padx=5, pady=5)
+    styled_label(supplier_row, "Expected Date:", font=FONT_BOLD).grid(row=0, column=1, sticky="w", padx=(20, 5), pady=5)
     
     supplier_var = tk.StringVar()
-    supplier_combo = ttk.Combobox(supplier_frame, textvariable=supplier_var, state="readonly", width=40)
-    supplier_combo.grid(row=1, column=0, sticky=tk.EW, padx=5, pady=5)
+    supplier_combo = ttk.Combobox(supplier_row, textvariable=supplier_var, state="readonly", width=40)
+    supplier_combo.grid(row=1, column=0, sticky="ew", padx=5, pady=5)
+    
+    expected_var = tk.StringVar()
+    expected_entry = ttk.Entry(supplier_row, textvariable=expected_var, width=15)
+    expected_entry.grid(row=1, column=1, sticky="w", padx=5, pady=5)
     
     # Load suppliers
     suppliers = get_suppliers_list()
     supplier_data = [(s['id'], f"{s['code']} - {s['name']}") for s in suppliers]
     supplier_combo['values'] = [s[1] for s in supplier_data]
     
-    styled_label(supplier_frame, "Expected Date:", font=FONT_BOLD).grid(row=0, column=1, sticky=tk.W, padx=5, pady=5)
-    
-    expected_var = tk.StringVar()
-    expected_entry = ttk.Entry(supplier_frame, textvariable=expected_var, width=15)
-    expected_entry.grid(row=1, column=1, sticky=tk.W, padx=5, pady=5)
-    
     # Set default expected date (7 days from now)
     default_expected = (datetime.now() + timedelta(days=7)).strftime('%Y-%m-%d')
     expected_var.set(default_expected)
     
-    # Products list
-    styled_label(content, "Add Products:", font=FONT_BOLD).pack(anchor=tk.W, pady=(10, 5))
+    # Product addition section
+    styled_label(form_card, "Add Products:", font=FONT_BOLD).pack(anchor="w", pady=(15, 8))
     
-    products_frame = make_card(content, padding=10)
-    products_frame.pack(fill=tk.BOTH, expand=True)
+    products_card = make_card(form_card, padding=15)
+    products_card.pack(fill="x", pady=(0, 15))
     
-    # Product selection row
-    select_frame = ttk.Frame(products_frame)
-    select_frame.pack(fill=tk.X, pady=(0, 10))
+    # Product selection row with better spacing
+    select_frame = ttk.Frame(products_card)
+    select_frame.pack(fill="x", pady=(0, 10))
     
-    styled_label(select_frame, "Product:").pack(side=tk.LEFT, padx=5)
+    styled_label(select_frame, "Product:", font=FONT_BOLD).pack(side="left", padx=(0, 5))
     
     product_var = tk.StringVar()
     product_combo = ttk.Combobox(select_frame, textvariable=product_var, state="readonly", width=35)
-    product_combo.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+    product_combo.pack(side="left", padx=5, fill="x", expand=True)
     
-    # Load products
-    with get_db_cursor() as cur:
-        cur.execute("""
-            SELECT id, model, category, stock, purchase_price, supplier_id
-            FROM products
-            WHERE status = 'active'
-            ORDER BY model
-        """)
-        products = cur.fetchall()
+    # Load products from database
+    try:
+        with get_db_cursor() as cur:
+            cur.execute("""
+                SELECT id, model, category, stock, purchase_price, supplier_id
+                FROM products
+                WHERE status = 'active'
+                ORDER BY model
+            """)
+            products = cur.fetchall()
+        
+        product_data = [(p['id'], f"{p['model']} (Stock: {p['stock']}, Cost: Rs. {p['purchase_price']})") for p in products]
+        product_combo['values'] = [p[1] for p in product_data]
+    except Exception as e:
+        logging.error(f"Failed to load products: {e}")
+        product_data = []
+        product_combo['values'] = ["No products available"]
     
-    product_data = [(p['id'], f"{p['model']} (Stock: {p['stock']}, Cost: Rs. {p['purchase_price']})") for p in products]
-    product_combo['values'] = [p[1] for p in product_data]
-    
-    styled_label(select_frame, "Qty:").pack(side=tk.LEFT, padx=(15, 5))
+    styled_label(select_frame, "Qty:", font=FONT_BOLD).pack(side="left", padx=(15, 5))
     
     qty_var = tk.StringVar(value="1")
     qty_entry = ttk.Entry(select_frame, textvariable=qty_var, width=8)
-    qty_entry.pack(side=tk.LEFT, padx=5)
+    qty_entry.pack(side="left", padx=5)
     
-    styled_label(select_frame, "Unit Price:").pack(side=tk.LEFT, padx=(10, 5))
+    styled_label(select_frame, "Unit Price:", font=FONT_BOLD).pack(side="left", padx=(10, 5))
     
     price_var = tk.StringVar(value="0")
-    price_entry = ttk.Entry(select_frame, textvariable=price_var, width=10)
-    price_entry.pack(side=tk.LEFT, padx=5)
+    price_entry = ttk.Entry(select_frame, textvariable=price_var, width=12)
+    price_entry.pack(side="left", padx=5)
     
-    # Items list
-    styled_label(content, "Order Items:", font=FONT_BOLD).pack(anchor=tk.W, pady=(10, 5))
+    # Add button
+    add_btn = make_button(select_frame, "➕ Add", command=lambda: None, kind="primary")
+    add_btn.pack(side="left", padx=15)
     
-    items_frame = ttk.Frame(products_frame)
-    items_frame.pack(fill=tk.BOTH, expand=True)
+    # Items list section
+    styled_label(form_card, "Order Items:", font=FONT_BOLD).pack(anchor="w", pady=(10, 5))
+    
+    items_frame = ttk.Frame(form_card)
+    items_frame.pack(fill="both", expand=True)
     
     columns = ("product", "quantity", "unit_price", "total", "actions")
-    items_tree = ttk.Treeview(items_frame, columns=columns, show="headings", height=10)
+    items_tree = ttk.Treeview(items_frame, columns=columns, show="headings", height=8)
     
+    column_widths = {"product": 280, "quantity": 100, "unit_price": 130, "total": 130, "actions": 100}
     for col in columns:
-        items_tree.heading(col, text=col.title())
-        items_tree.column(col, width=120 if col != "product" else 250)
+        items_tree.heading(col, text=col.replace("_", " ").title())
+        items_tree.column(col, width=column_widths.get(col, 120))
     
-    items_tree.pack(fill=tk.BOTH, expand=True)
+    scrollbar = ttk.Scrollbar(items_frame, orient="vertical", command=items_tree.yview)
+    items_tree.configure(yscrollcommand=scrollbar.set)
+    
+    items_tree.pack(side="left", fill="both", expand=True)
+    scrollbar.pack(side="right", fill="y")
     
     # PO items storage
     po_items = []
@@ -361,7 +385,7 @@ def open_create_po_dialog(parent, current_user=None):
         qty = qty_var.get()
         price = price_var.get()
         
-        if not product_sel:
+        if not product_sel or product_sel == "No products available":
             messagebox.showerror("Error", "Please select a product")
             return
         
@@ -374,7 +398,7 @@ def open_create_po_dialog(parent, current_user=None):
             messagebox.showerror("Error", "Invalid quantity or price")
             return
         
-        # Find product
+        # Find product ID
         product_id = None
         product_name = None
         for pid, pname in product_data:
@@ -384,6 +408,7 @@ def open_create_po_dialog(parent, current_user=None):
                 break
         
         if not product_id:
+            messagebox.showerror("Error", "Product not found")
             return
         
         total = qty_int * price_float
@@ -410,6 +435,10 @@ def open_create_po_dialog(parent, current_user=None):
         product_var.set("")
         qty_var.set("1")
         price_var.set("0")
+        update_total()
+    
+    # Connect add button
+    add_btn.config(command=add_item)
     
     def on_item_click(event):
         sel = items_tree.selection()
@@ -422,35 +451,32 @@ def open_create_po_dialog(parent, current_user=None):
             if 0 <= index < len(po_items):
                 po_items.pop(index)
                 items_tree.delete(sel[0])
+                update_total()
     
     items_tree.bind("<Button-1>", on_item_click)
     
-    # Add button
-    make_button(select_frame, "➕ Add", command=add_item, kind="primary").pack(side=tk.LEFT, padx=10)
-    
-    # Notes
-    styled_label(content, "Notes:", font=FONT_BOLD).pack(anchor=tk.W, pady=(10, 5))
-    notes_text = tk.Text(content, height=3)
-    notes_text.pack(fill=tk.X, pady=(0, 10))
+    # Notes section
+    styled_label(form_card, "Notes:", font=FONT_BOLD).pack(anchor="w", pady=(15, 5))
+    notes_text = tk.Text(form_card, height=3, font=FONT_REGULAR)
+    notes_text.pack(fill="x", pady=(0, 15))
     
     # Total label
     total_var = tk.StringVar(value="Total: Rs. 0.00")
-    total_label = styled_label(content, textvariable=total_var, font=("Segoe UI", 14, "bold"), foreground=COLOR_PRIMARY)
-    total_label.pack(anchor=tk.E, pady=(5, 10))
+    total_label = styled_label(form_card, textvariable=total_var, font=("Segoe UI", 14, "bold"), foreground=COLOR_SUCCESS)
+    total_label.pack(anchor="e", pady=(5, 10))
     
-    # Update total when items change
     def update_total():
         total = sum(item['total'] for item in po_items)
         total_var.set(f"Total: Rs. {total:,.2f}")
     
-    # Buttons
-    btn_frame = ttk.Frame(content)
-    btn_frame.pack(fill=tk.X, pady=(10, 0))
+    # Button bar at bottom
+    button_frame = ttk.Frame(content)
+    button_frame.pack(fill="x", pady=(10, 25))
     
     def save_po():
         supplier_sel = supplier_var.get()
         expected_date = expected_var.get().strip()
-        notes = notes_text.get("1.0", tk.END).strip()
+        notes = notes_text.get("1.0", "end").strip()
         
         if not supplier_sel:
             messagebox.showerror("Error", "Please select a supplier")
@@ -468,7 +494,7 @@ def open_create_po_dialog(parent, current_user=None):
                 break
         
         # Generate PO number
-        po_number = f"PO-{datetime.now().strftime('%Y%m%d%H%M')}"
+        po_number = f"PO-{datetime.now().strftime('%Y%m%d%H%M%S')}"
         
         try:
             with get_db_cursor() as cur:
@@ -487,7 +513,10 @@ def open_create_po_dialog(parent, current_user=None):
                         VALUES (?, ?, ?, ?, ?)
                     """, (po_id, item['product_id'], item['quantity'], item['unit_price'], item['total']))
             
-            messagebox.showinfo("Success", f"Purchase Order created: {po_number}")
+            # Link to inventory (will be processed when received)
+            # data_linker.process_purchase_order(po_items, supplier_id)
+            
+            messagebox.showinfo("Success", f"Purchase Order created:\n{po_number}")
             dlg.destroy()
             
             # Refresh parent
@@ -496,10 +525,17 @@ def open_create_po_dialog(parent, current_user=None):
                 
         except Exception as e:
             logging.exception("Failed to create purchase order")
-            messagebox.showerror("Error", f"Failed to create PO: {e}")
+            messagebox.showerror("Error", f"Failed to create PO: {str(e)}")
     
-    make_button(btn_frame, "💾 Create PO", command=save_po, kind="success").pack(side=tk.LEFT, padx=5)
-    make_button(btn_frame, "Cancel", command=dlg.destroy, kind="secondary").pack(side=tk.LEFT, padx=5)
+    # Buttons - right aligned, never hidden
+    cancel_btn = make_button(button_frame, "Cancel", command=dlg.destroy, kind="secondary", width=15)
+    cancel_btn.pack(side="right", padx=10)
+    
+    create_btn = make_button(button_frame, "💾 Create PO", command=save_po, kind="success", width=20)
+    create_btn.pack(side="right", padx=10)
+    
+    # Auto-update total when items change
+    update_total()
 
 
 def open_po_details(parent, po_id, current_user=None):

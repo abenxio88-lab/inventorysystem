@@ -200,65 +200,134 @@ def create_sales_tab(parent):
 
 def open_record_sale_dialog(master, on_refresh):
     """
-    Opens a dialog to record a new sale.
+    Opens a premium dialog to record a new sale.
+    - Proper sizing (no hidden buttons)
+    - Scrollable content
+    - Glassmorphism design
     """
-    dlg = tk.Toplevel(master)
-    dlg.title("Record Sale")
-    dlg.geometry("450x400") # Slightly smaller dialog
-    dlg.resizable(False, False)
-    dlg.focus_set()
-    dlg.grab_set()
-
-    cnt = frame(dlg, padding=20)
-    cnt.pack(fill="both", expand=True)
-
-    label(cnt, "NEW SALE", kind="heading", foreground=COLOR_PRIMARY).pack(pady=(0, 20))
-
-    form = make_card(cnt, padx=20, pady=20)
-    form.pack(fill="both", expand=True)
-
+    from app_core import PremiumPopup, app_state
+    
+    dlg = PremiumPopup(master, "Record New Sale", width=700, height=550, resizable=True)
+    content = dlg.get_content_frame()
+    
+    # Header
+    header_card = make_card(content, padx=30, pady=20)
+    header_card.pack(fill="x", pady=(20, 15))
+    
+    industry_config = app_state.get_industry_config()
+    header_title = label(header_card, f"{industry_config['icon']} Record Sale", 
+                        kind="heading", foreground=COLOR_PRIMARY)
+    header_title.pack()
+    
+    # Industry-specific info badge
+    if industry_config['features']:
+        features_text = " • ".join(industry_config['features'])
+        features_label = label(header_card, features_text, 
+                              foreground=COLOR_TEXT_MUTED, size=11)
+        features_label.pack(pady=(5, 0))
+    
+    # Form Card
+    form_card = make_card(content, padx=30, pady=25)
+    form_card.pack(fill="both", expand=True, pady=(0, 15))
+    
     # Model Selection
-    label(form, "Model", kind="bold").grid(row=0, column=0, sticky="w")
+    label(form_card, "Select Product Model", kind="bold", 
+          foreground=COLOR_TEXT_MAIN).grid(row=0, column=0, sticky="w", pady=(0, 8))
+    
     model_var = tk.StringVar()
-    models = sorted(list({i.get("model") for i in load_inventory()}))
-    model_sel = combobox(form, values=models, textvariable=model_var, state="readonly")
-    try: model_sel.configure(width=25)
+    models = sorted(list({i.get("model") for i in load_inventory() if i.get("stock", 0) > 0}))
+    
+    if not models:
+        models = ["No products available"]
+        model_sel = combobox(form_card, values=models, textvariable=model_var, state="readonly")
+    else:
+        model_sel = combobox(form_card, values=models, textvariable=model_var, state="readonly")
+    
+    model_sel.grid(row=1, column=0, sticky="ew", pady=(0, 15), columnspan=2)
+    try: model_sel.configure(width=40)
     except: pass
-    model_sel.grid(row=1, column=0, sticky="ew", pady=(5, 15), columnspan=2)
-
-    stock_info = label(form, "Available: — | Price: 0.00", foreground=COLOR_TEXT_MUTED)
-    stock_info.grid(row=2, column=0, columnspan=2, sticky="w")
-
+    
+    # Stock Info Display
+    stock_frame = make_card(form_card, padx=15, pady=10)
+    stock_frame.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(0, 20))
+    
+    stock_info = label(stock_frame, "Available: — | Unit Price: 0.00", 
+                      foreground=COLOR_TEXT_MUTED, size=12)
+    stock_info.pack(side="left")
+    
+    stock_alert = label(stock_frame, "", foreground=COLOR_DANGER, size=11, bold=True)
+    stock_alert.pack(side="right")
+    
     # Quantity
-    label(form, "Quantity", kind="bold").grid(row=3, column=0, sticky="w", pady=(10, 0))
+    qty_label = label(form_card, "Quantity", kind="bold", foreground=COLOR_TEXT_MAIN)
+    qty_label.grid(row=3, column=0, sticky="w", pady=(10, 8))
+    
     qty_var = tk.IntVar(value=1)
-    qty_spin = ttk.Spinbox(form, from_=1, to=1000, textvariable=qty_var)
-    qty_spin.grid(row=4, column=0, columnspan=2, sticky="ew", pady=(5, 15))
-
-    total_lbl = label(form, "Total: 0.00", kind="bold", foreground=COLOR_SUCCESS)
-    total_lbl.grid(row=5, column=0, columnspan=2, pady=10)
-
+    qty_spin = ttk.Spinbox(form_card, from_=1, to=10000, textvariable=qty_var, font=FONT_REGULAR)
+    qty_spin.grid(row=4, column=0, sticky="ew", pady=(0, 15))
+    try: qty_spin.configure(width=20)
+    except: pass
+    
+    # Total Display
+    total_frame = make_card(form_card, padx=20, pady=15)
+    total_frame.grid(row=5, column=0, columnspan=2, sticky="ew", pady=(10, 20))
+    
+    total_lbl = label(total_frame, "Total Amount: $0.00", 
+                     kind="heading", foreground=COLOR_SUCCESS)
+    total_lbl.pack()
+    
     def update_info(event=None):
         sel = model_var.get()
-        if not sel: return
+        if not sel or sel == "No products available": 
+            return
+        
         for it in load_inventory():
             if it.get("model") == sel:
-                s = it.get("stock", 0)
-                p = it.get("selling_price", 0)
-                stock_info.config(text=f"Available: {s} | Price: {p:.2f}")
-                try: total_lbl.config(text=f"Total: {int(qty_var.get()) * float(p):.2f}")
-                except: pass
+                s = int(it.get("stock", 0))
+                p = float(it.get("selling_price", 0))
+                
+                stock_info.config(text=f"Available: {s} | Unit Price: ${p:.2f}")
+                
+                try: 
+                    qty = int(qty_var.get())
+                    if qty > s:
+                        stock_alert.config(text=f"⚠️ Only {s} in stock!")
+                        total_lbl.config(text=f"Total Amount: ${s * p:.2f}")
+                        qty_var.set(s)
+                    else:
+                        stock_alert.config(text="")
+                        total_lbl.config(text=f"Total Amount: ${qty * p:.2f}")
+                except: 
+                    total_lbl.config(text=f"Total Amount: ${p:.2f}")
                 return
-
+    
     model_sel.bind("<<ComboboxSelected>>", update_info)
     qty_spin.bind("<KeyRelease>", update_info)
     qty_spin.config(command=update_info)
-
+    
+    # Initialize display
+    if models and models[0] != "No products available":
+        model_sel.set(models[0])
+        update_info()
+    
+    # Button Bar - Using responsive layout
+    button_frame = ttk.Frame(content)
+    button_frame.pack(fill="x", pady=(10, 25))
+    
     def save_sale_action():
         m = model_var.get()
+        if m == "No products available":
+            messagebox.showwarning("No Products", "No products available in inventory.")
+            return
+            
         try: q = int(qty_var.get())
-        except: return
-        if not m or q <= 0: return
+        except: 
+            messagebox.showerror("Invalid Input", "Please enter a valid quantity.")
+            return
+            
+        if not m or q <= 0: 
+            messagebox.showwarning("Invalid Input", "Please select a product and enter quantity.")
+            return
 
         inv_data = load_inventory()
         item_found = None
@@ -266,17 +335,21 @@ def open_record_sale_dialog(master, on_refresh):
             if it.get("model") == m:
                 current_stock = int(it.get("stock", 0))
                 if current_stock < q:
-                    # Notify user but allow the sale to be recorded; mark stock as low (no error)
-                    try:
-                        messagebox.showinfo("Low Stock", f"Only {current_stock} in stock. Recording sale and setting stock to 0.")
-                    except Exception:
-                        pass
+                    response = messagebox.askyesno(
+                        "Low Stock Warning", 
+                        f"Only {current_stock} items in stock!\n\nDo you want to record this sale and set stock to 0?"
+                    )
+                    if not response:
+                        return
                 # Reduce stock but never go below 0
                 it["stock"] = max(0, current_stock - q)
                 item_found = it
                 break
         
-        if not item_found: return
+        if not item_found: 
+            messagebox.showerror("Error", "Product not found.")
+            return
+            
         save_inventory(inv_data)
 
         d = datetime.now()
@@ -288,10 +361,34 @@ def open_record_sale_dialog(master, on_refresh):
             "quantity": q,
             "selling_price": item_found.get("selling_price", 0),
             "purchase_price": item_found.get("purchase_price", 0),
-            "total": float(item_found.get("selling_price", 0)) * q
+            "total": float(item_found.get("selling_price", 0)) * q,
+            "user": getattr(app_state, 'current_user', 'Unknown')
         })
         save_sales(s)
+        
+        # Trigger data link update
+        try:
+            from app_core import data_linker
+            # In real implementation, this would notify other modules
+        except:
+            pass
+        
+        messagebox.showsuccess("Success", "Sale recorded successfully!") if hasattr(messagebox, 'showsuccess') else messagebox.showinfo("Success", "Sale recorded successfully!")
         on_refresh()
         dlg.destroy()
 
-    make_button(form, "Confirm Sale", command=save_sale_action, kind="success", width=20).grid(row=6, column=0, columnspan=2, pady=10)
+    # Cancel button
+    cancel_btn = make_button(button_frame, "Cancel", command=dlg.destroy, kind="secondary", width=15)
+    cancel_btn.pack(side="right", padx=10)
+    
+    # Confirm button
+    confirm_btn = make_button(button_frame, "✓ Confirm Sale", command=save_sale_action, kind="success", width=20)
+    confirm_btn.pack(side="right", padx=10)
+    
+    # Center the dialog properly
+    dlg.update_idletasks()
+    dlg_width = 700
+    dlg_height = 550
+    x = master.winfo_x() + (master.winfo_width() - dlg_width) // 2
+    y = master.winfo_y() + (master.winfo_height() - dlg_height) // 2
+    dlg.geometry(f"+{x}+{y}")
