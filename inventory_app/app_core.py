@@ -90,14 +90,18 @@ class AppState:
 
 class PremiumPopup(tk.Toplevel):
     """
-    Universal Premium Popup Window
-    - Glassmorphism design
+    Universal Premium Popup Window - International Software Standard
+    - Glassmorphism design with theme support
+    - Resizable/full-screen capable for better visibility
     - Responsive layout (no hidden buttons)
     - Auto-scrolling for content overflow
     - Centered positioning
+    - SAP/Oracle NetSuite inspired UX patterns
     """
-    def __init__(self, parent, title: str, width: int = 800, height: int = 600, 
-                 resizable: bool = True, modal: bool = True, **kwargs):
+    def __init__(self, parent, title: str, width: int = 900, height: int = 650, 
+                 resizable: bool = True, modal: bool = True, 
+                 fullscreen_capable: bool = True, min_width: int = 700, min_height: int = 500,
+                 **kwargs):
         super().__init__(parent)
         
         self.title(title)
@@ -108,10 +112,15 @@ class PremiumPopup(tk.Toplevel):
             self.transient(parent)
             self.grab_set()
             
-        # Allow resizing but set min size
+        # Allow resizing with configurable minimums
         if resizable:
-            self.minsize(600, 400)
+            self.minsize(min_width, min_height)
             self.resizable(True, True)
+        
+        # Full-screen capability toggle
+        self.fullscreen_capable = fullscreen_capable
+        self._is_fullscreen = False
+        self._windowed_geometry = None
         
         # Center on parent
         self.update_idletasks()
@@ -148,13 +157,59 @@ class PremiumPopup(tk.Toplevel):
         self.canvas.pack(side="left", fill="both", expand=True)
         self.scrollbar.pack(side="right", fill="y")
         
-        # Store reference to app state
-        from ui_theme import get_color
-        self.get_color = get_color
+        # Store reference to app state and utilities
+        try:
+            from ui_theme import get_color, make_button, BUTTON_STANDARD_WIDTH
+            self.get_color = get_color
+            self.make_button = make_button
+        except ImportError:
+            self.get_color = lambda name: "#F0F4F8"
+            self.make_button = None
         
         # Apply theme
         self.apply_theme()
         
+        # Add fullscreen toggle if enabled
+        if fullscreen_capable:
+            self._add_window_controls()
+    
+    def _add_window_controls(self):
+        """Add window control buttons (fullscreen toggle, etc.)"""
+        control_frame = ttk.Frame(self)
+        control_frame.pack(fill="x", padx=10, pady=5)
+        
+        # Fullscreen toggle button
+        if self.make_button:
+            self.fs_button = self.make_button(
+                control_frame, 
+                "⛶ Fullscreen", 
+                command=self.toggle_fullscreen,
+                kind="info",
+                uniform=False
+            )
+            self.fs_button.pack(side="right")
+    
+    def toggle_fullscreen(self):
+        """Toggle between fullscreen and windowed mode"""
+        if not self.fullscreen_capable:
+            return
+            
+        if self._is_fullscreen:
+            # Exit fullscreen
+            self.attributes('-fullscreen', False)
+            if self._windowed_geometry:
+                self.geometry(self._windowed_geometry)
+            self._is_fullscreen = False
+            if hasattr(self, 'fs_button'):
+                self.fs_button.configure(text="⛶ Fullscreen")
+        else:
+            # Enter fullscreen
+            self._windowed_geometry = self.geometry()
+            self.attributes('-fullscreen', True)
+            self._is_fullscreen = True
+            if hasattr(self, 'fs_button'):
+                self.fs_button.configure(text="❐ Windowed")
+    
     def _on_canvas_configure(self, event):
         """Adjust scrollable frame width to match canvas"""
         self.canvas.itemconfig(self.canvas_window, width=event.width)
@@ -168,7 +223,10 @@ class PremiumPopup(tk.Toplevel):
             
     def apply_theme(self):
         """Apply current theme colors"""
-        bg_color = self.get_color("bg_primary")
+        try:
+            bg_color = self.get_color("app_bg")
+        except:
+            bg_color = "#F0F4F8"
         self.configure(bg=bg_color)
         self.canvas.configure(bg=bg_color)
         
@@ -176,21 +234,36 @@ class PremiumPopup(tk.Toplevel):
         """Return the scrollable content frame for adding widgets"""
         return self.scrollable_frame
     
-    def add_button_bar(self, buttons: list, pady: int = 20):
+    def add_button_bar(self, buttons: list, pady: int = 20, use_uniform: bool = True):
         """
         Add a responsive button bar at the bottom of the popup
         Buttons automatically wrap if window is too narrow
+        
+        Args:
+            buttons: List of button configs with text, command, kind
+            pady: Vertical padding
+            use_uniform: Apply uniform button sizing (default: True)
         """
         button_frame = ttk.Frame(self.scrollable_frame)
         button_frame.pack(fill="x", padx=40, pady=pady)
         
         for btn_config in buttons:
-            btn = ttk.Button(
-                button_frame, 
-                text=btn_config.get("text", "Action"),
-                command=btn_config.get("command", lambda: None),
-                style=btn_config.get("style", "Accent.TButton")
-            )
+            if self.make_button:
+                btn = self.make_button(
+                    button_frame, 
+                    text=btn_config.get("text", "Action"),
+                    command=btn_config.get("command", lambda: None),
+                    kind=btn_config.get("kind", "primary"),
+                    icon=btn_config.get("icon", ""),
+                    uniform=use_uniform
+                )
+            else:
+                btn = ttk.Button(
+                    button_frame, 
+                    text=btn_config.get("text", "Action"),
+                    command=btn_config.get("command", lambda: None),
+                    style=btn_config.get("style", "Accent.TButton")
+                )
             btn.pack(side="left", padx=5, expand=False, fill="x")
             
         return button_frame

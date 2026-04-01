@@ -11,9 +11,11 @@ import logging
 try:
     from .database import get_db_cursor, get_connection
     from .ui_theme import make_card, styled_label, make_button, FONT_REGULAR, FONT_BOLD, COLOR_PRIMARY, COLOR_SUCCESS, COLOR_DANGER, COLOR_WARNING
+    from .app_core import PremiumPopup
 except (ImportError, ModuleNotFoundError):
     from database import get_db_cursor, get_connection
     from ui_theme import make_card, styled_label, make_button, FONT_REGULAR, FONT_BOLD, COLOR_PRIMARY, COLOR_SUCCESS, COLOR_DANGER, COLOR_WARNING
+    from app_core import PremiumPopup
 
 
 def create_electronics_tab(parent, current_user=None):

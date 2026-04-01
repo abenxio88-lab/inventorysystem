@@ -275,6 +275,13 @@ SHADOW_DEFAULT = "0 4px 12px rgba(0,0,0,0.1)"
 SHADOW_LARGE = "0 8px 24px rgba(0,0,0,0.12)"
 SHADOW_GLASS = "0 8px 32px rgba(31, 38, 135, 0.15)"
 
+# Button Standardization - International Software Standards (SAP, Oracle NetSuite inspired)
+BUTTON_STANDARD_WIDTH = 14  # Character width for uniform buttons
+BUTTON_MIN_WIDTH = 100      # Minimum pixel width
+BUTTON_HEIGHT_CHARS = 2     # Height in character rows
+BUTTON_PADDING_X = 20       # Horizontal padding
+BUTTON_PADDING_Y = 12       # Vertical padding
+
 
 def setup_theme(root=None, theme_name="litera", is_dark=False):
     """Setup application-wide premium theme. Safe to call multiple times.
@@ -575,8 +582,28 @@ def styled_entry(master, **kwargs):
     return e
 
 
-def make_button(master, text, command=None, kind="primary", icon="", **kwargs):
-    """Return a premium themed button with optional icon."""
+def make_button(master, text, command=None, kind="primary", icon="", uniform=True, **kwargs):
+    """Return a premium themed button with optional icon and normalized sizing.
+    
+    Args:
+        master: Parent widget
+        text: Button text
+        command: Callback function
+        kind: Button style (primary, success, danger, secondary, info, warning)
+        icon: Optional emoji/icon prefix
+        uniform: If True, apply standard width for consistent UI (default: True)
+        **kwargs: Additional ttk.Button options
+    
+    Returns:
+        Configured ttk.Button or tb.Button widget
+    """
+    # Apply uniform sizing by default (international software standard)
+    if uniform and 'width' not in kwargs:
+        kwargs['width'] = BUTTON_STANDARD_WIDTH
+    
+    if 'padding' not in kwargs:
+        kwargs['padding'] = (BUTTON_PADDING_X, BUTTON_PADDING_Y)
+    
     if USING_BOOTSTRAP and tb is not None:
         boot_map = {
             "primary": "primary",
