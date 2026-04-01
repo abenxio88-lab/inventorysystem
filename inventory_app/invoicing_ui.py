@@ -254,8 +254,8 @@ def open_create_invoice_dialog(parent, current_user=None, from_barcode=False, ba
     """Dialog to create a new invoice."""
     dlg = tk.Toplevel(parent)
     dlg.title("Create New Invoice")
-    dlg.geometry("900x750")
-    dlg.resizable(False, False)
+    dlg.geometry("1200x900")
+    dlg.resizable(True, True)
     dlg.transient(parent)
     dlg.grab_set()
     
@@ -602,8 +602,8 @@ def open_invoice_details(parent, invoice_id, current_user=None):
     """View invoice details."""
     dlg = tk.Toplevel(parent)
     dlg.title("Invoice Details")
-    dlg.geometry("750x650")
-    dlg.resizable(False, False)
+    dlg.geometry("1000x850")
+    dlg.resizable(True, True)
     dlg.transient(parent)
     dlg.grab_set()
     
@@ -709,8 +709,8 @@ def open_invoice_payment_dialog(parent, invoice_id, current_user=None):
     """Dialog to record payment against invoice."""
     dlg = tk.Toplevel(parent)
     dlg.title("Record Payment")
-    dlg.geometry("500x400")
-    dlg.resizable(False, False)
+    dlg.geometry("700x600")
+    dlg.resizable(True, True)
     dlg.transient(parent)
     dlg.grab_set()
     

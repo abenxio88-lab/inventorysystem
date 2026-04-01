@@ -209,8 +209,8 @@ def open_location_dialog(parent, location_id=None, current_user=None):
     
     dlg = tk.Toplevel(parent)
     dlg.title("Edit Location" if is_edit else "Add Location")
-    dlg.geometry("500x550")
-    dlg.resizable(False, False)
+    dlg.geometry("700x750")
+    dlg.resizable(True, True)
     dlg.transient(parent)
     dlg.grab_set()
     

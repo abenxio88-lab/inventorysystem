@@ -192,8 +192,8 @@ def create_industry_selector(parent, on_select_callback=None):
     """
     dlg = tk.Toplevel(parent)
     dlg.title("Select Your Business Type")
-    dlg.geometry("900x600")
-    dlg.resizable(False, False)
+    dlg.geometry("1100x800")
+    dlg.resizable(True, True)
     dlg.transient(parent)
     dlg.grab_set()
     
