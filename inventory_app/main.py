@@ -151,9 +151,38 @@ def open_dashboard(username, role, root=None):
         except Exception as e:
             logging.warning(f"Alert check failed: {e}")
     
-    # Create main frame with status bar
+    # Create main frame with status bar and theme toggle
     main_frame = ttk.Frame(root)
     main_frame.pack(fill="both", expand=True)
+    
+    # Top bar with theme toggle
+    top_bar = ttk.Frame(main_frame)
+    top_bar.pack(fill="x", padx=10, pady=(10, 0))
+    
+    # Theme toggle button
+    def on_theme_toggle():
+        from ui_theme import toggle_theme, get_color
+        is_dark = toggle_theme(root)
+        # Update button text
+        theme_btn.configure(text="🌙 Dark" if not is_dark else "☀️ Light")
+        # Refresh UI colors (notebook tabs need update)
+        try:
+            app_bg = get_color('app_bg')
+            card_bg = get_color('card_bg')
+            text_main = get_color('text_main')
+            root.configure(bg=app_bg)
+            main_frame.configure(bg=app_bg)
+            # Update notebook styling
+            for i in range(notebook.index("end") + 1):
+                try:
+                    notebook.tab(i, foreground=text_main)
+                except:
+                    pass
+        except Exception as e:
+            logging.warning(f"Theme toggle UI update failed: {e}")
+    
+    theme_btn = make_button(top_bar, text="🌙 Dark", command=on_theme_toggle, kind="secondary")
+    theme_btn.pack(side="right", padx=(0, 10))
     
     notebook = ttk.Notebook(main_frame)
     notebook.pack(pady=10, padx=10, fill="both", expand=True)
@@ -378,8 +407,8 @@ if __name__ == "__main__":
     app_root.title("Minataka Sphere - Inventory System")
 
     try:
-        # Set the new 'litera' theme
-        setup_theme(app_root, theme_name="litera")
+        # Set the new 'litera' theme (light mode by default)
+        setup_theme(app_root, theme_name="litera", is_dark=False)
     except Exception as e:
         logging.warning("Theme setup failed at startup: %s", e, exc_info=True)
     
