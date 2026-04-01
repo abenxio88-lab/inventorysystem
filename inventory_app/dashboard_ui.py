@@ -1,5 +1,10 @@
+"""
+Premium Dashboard UI with Interactive Charts, AI Insights, and Glassmorphism
+"""
 import tkinter as tk
 from tkinter import ttk
+import sqlite3
+from datetime import datetime, timedelta
 
 try:
     from .ui_theme import (
@@ -10,6 +15,8 @@ try:
         SPACING_DEFAULT, SPACING_LARGE, get_color, toggle_theme, get_current_theme,
         make_glass_card, create_badge
     )
+    from .premium_widgets import InteractiveChart, ToastNotification, PremiumButton
+    from .ai_intelligence import InventoryHealthAnalyzer, AIDemandForecaster, SmartReorderEngine
 except (ImportError, ModuleNotFoundError):
     from ui_theme import (
         make_card, styled_label, FONT_HEADING, COLOR_TEXT_MUTED,
@@ -19,6 +26,14 @@ except (ImportError, ModuleNotFoundError):
         SPACING_DEFAULT, SPACING_LARGE, get_color, toggle_theme, get_current_theme,
         make_glass_card, create_badge
     )
+    try:
+        from premium_widgets import InteractiveChart, ToastNotification, PremiumButton
+        from ai_intelligence import InventoryHealthAnalyzer, AIDemandForecaster, SmartReorderEngine
+    except:
+        InteractiveChart = None
+        ToastNotification = None
+        PremiumButton = None
+        InventoryHealthAnalyzer = None
 
 try:
     from .utils import load_settings, save_settings
@@ -28,11 +43,6 @@ except (ImportError, ModuleNotFoundError):
     except Exception:
         load_settings = lambda: {"backup_hour": 2, "backup_minute": 0, "backup_retention": 30}
         save_settings = lambda s: s
-
-    try:
-        from users_ui import open_user_manager
-    except Exception:
-        open_user_manager = None
 
 try:
     from .inventory_ui import load_inventory
