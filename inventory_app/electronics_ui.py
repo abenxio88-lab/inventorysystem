@@ -235,8 +235,8 @@ def open_add_serial_dialog(parent, current_user=None):
     """Dialog to add a new serial number for a product."""
     dlg = tk.Toplevel(parent)
     dlg.title("Add Device Serial Number")
-    dlg.geometry("500x550")
-    dlg.resizable(False, False)
+    dlg.geometry("700x750")
+    dlg.resizable(True, True)
     dlg.transient(parent)
     dlg.grab_set()
     
@@ -365,8 +365,8 @@ def open_device_details(parent, serial_id):
     """View detailed device information."""
     dlg = tk.Toplevel(parent)
     dlg.title("Device Details")
-    dlg.geometry("600x600")
-    dlg.resizable(False, False)
+    dlg.geometry("800x800")
+    dlg.resizable(True, True)
     dlg.transient(parent)
     dlg.grab_set()
     
@@ -439,8 +439,8 @@ def open_mark_sold_dialog(parent, serial_id):
     """Mark a device as sold."""
     dlg = tk.Toplevel(parent)
     dlg.title("Mark Device as Sold")
-    dlg.geometry("400x300")
-    dlg.resizable(False, False)
+    dlg.geometry("600x500")
+    dlg.resizable(True, True)
     dlg.transient(parent)
     dlg.grab_set()
     

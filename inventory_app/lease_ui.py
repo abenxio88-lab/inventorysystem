@@ -235,8 +235,8 @@ def open_create_lease_dialog(parent, current_user=None):
     """Dialog to create a new lease."""
     dlg = tk.Toplevel(parent)
     dlg.title("Create New Lease")
-    dlg.geometry("600x650")
-    dlg.resizable(False, False)
+    dlg.geometry("800x850")
+    dlg.resizable(True, True)
     dlg.transient(parent)
     dlg.grab_set()
     
@@ -394,8 +394,8 @@ def open_lease_details(parent, lease_id, current_user=None):
     """View lease details."""
     dlg = tk.Toplevel(parent)
     dlg.title("Lease Details")
-    dlg.geometry("600x600")
-    dlg.resizable(False, False)
+    dlg.geometry("800x800")
+    dlg.resizable(True, True)
     dlg.transient(parent)
     dlg.grab_set()
     
@@ -475,8 +475,8 @@ def open_record_payment_dialog(parent, lease_id, current_user=None):
     """Dialog to record a lease payment."""
     dlg = tk.Toplevel(parent)
     dlg.title("Record Lease Payment")
-    dlg.geometry("450x400")
-    dlg.resizable(False, False)
+    dlg.geometry("650x600")
+    dlg.resizable(True, True)
     dlg.transient(parent)
     dlg.grab_set()
     
@@ -568,8 +568,8 @@ def open_return_item_dialog(parent, lease_id):
     """Dialog to process lease item return."""
     dlg = tk.Toplevel(parent)
     dlg.title("Return Lease Item")
-    dlg.geometry("500x400")
-    dlg.resizable(False, False)
+    dlg.geometry("700x600")
+    dlg.resizable(True, True)
     dlg.transient(parent)
     dlg.grab_set()
     
