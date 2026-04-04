@@ -577,10 +577,15 @@ def _preview_and_import_csv(filepath: str):
             "Import", "Merge with existing inventory?\nYes = merge, No = replace", parent=pv
         )
         try:
-            for item in parsed:
-                if merge:
-                    svc.inventory.upsert_product(item, username=getattr(app_state, "username", "system"))
-                else:
+            if merge:
+                # Merge: Only update products that don't exist, preserve existing
+                existing_models = {p.get("model") for p in svc.inventory.get_all_products()}
+                for item in parsed:
+                    if item.get("model") not in existing_models:
+                        svc.inventory.upsert_product(item, username=getattr(app_state, "username", "system"))
+            else:
+                # Replace: Upsert all products (overwrite existing)
+                for item in parsed:
                     svc.inventory.upsert_product(item, username=getattr(app_state, "username", "system"))
             messagebox.showinfo("Import", "Inventory imported successfully", parent=pv)
         except Exception:

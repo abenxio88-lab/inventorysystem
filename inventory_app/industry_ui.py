@@ -7,8 +7,6 @@ All industry config/state comes from industry_service.py — single source of tr
 
 import tkinter as tk
 from tkinter import ttk, messagebox
-import json
-import os
 import logging
 
 from ui_theme import make_card, styled_label, make_button, FONT_REGULAR, FONT_BOLD, COLOR_PRIMARY
@@ -16,8 +14,6 @@ from industry_service import (
     get_config, get_all_configs, get_current_industry_id, change_industry,
     INDUSTRY_CONFIG as INDUSTRY_CONFIGS,
 )
-
-from services import svc
 
 
 def create_industry_selector(parent, on_select_callback=None):

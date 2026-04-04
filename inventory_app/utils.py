@@ -525,3 +525,27 @@ try:
     ensure_default_data()
 except Exception:
     logging.exception("ensure_default_data failed")
+
+
+# ============================================================================
+# LOGIN RATE LIMITING HELPER
+# ============================================================================
+
+_login_rate_limiter = None
+
+def get_login_rate_limiter(max_attempts: int = 5, window_seconds: int = 300):
+    """
+    Get the singleton login rate limiter.
+    
+    Args:
+        max_attempts: Maximum login attempts before lockout (default: 5)
+        window_seconds: Lockout duration in seconds (default: 300 = 5 min)
+    
+    Returns:
+        RateLimiter instance for login attempts
+    """
+    global _login_rate_limiter
+    if _login_rate_limiter is None:
+        from security import RateLimiter
+        _login_rate_limiter = RateLimiter(max_attempts=max_attempts, window_seconds=window_seconds)
+    return _login_rate_limiter

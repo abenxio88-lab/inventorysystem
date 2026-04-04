@@ -71,16 +71,13 @@ def create_profit_tab(parent):
     """
     Creates the profit analysis tab, including a table of monthly data and a visual chart.
     """
-    window = ttk.Frame(parent, padding=20)
-    
-    label(window, "PROFITABILITY ANALYSIS", kind="heading").pack(anchor="w", pady=(0, 20))
-
     monthly_data = calculate_monthly_data()
 
     # --- Summary Data ---
     total_rev = sum(d["revenue"] for d in monthly_data.values())
     total_cost = sum(d["cost"] for d in monthly_data.values())
     total_prof = sum(d["profit"] for d in monthly_data.values())
+
     window = ttk.Frame(parent, padding=20)
 
     label(window, "PROFITABILITY ANALYSIS", kind="heading").pack(anchor="w", pady=(0, 20))

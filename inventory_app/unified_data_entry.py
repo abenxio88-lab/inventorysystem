@@ -22,7 +22,6 @@ Industry Types:
 import tkinter as tk
 from tkinter import ttk
 import os
-import sys
 import json
 import logging
 from datetime import datetime

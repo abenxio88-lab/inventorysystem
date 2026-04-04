@@ -6,7 +6,7 @@ Phase 5 - Complete Implementation
 """
 
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+from tkinter import ttk, messagebox
 import logging
 from datetime import datetime
 
@@ -15,7 +15,6 @@ from ui_theme import (
     FONT_HEADING, FONT_BOLD, FONT_REGULAR,
     COLOR_PRIMARY, COLOR_SUCCESS, COLOR_DANGER, COLOR_WARNING, COLOR_TEXT_MUTED
 )
-from utils import get_data_dir
 
 from services import svc
 

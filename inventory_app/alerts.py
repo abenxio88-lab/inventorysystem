@@ -293,7 +293,9 @@ class AlertManager:
                 return False
             
             values.append(alert_type)
-            
+
+            # Security: All column names below are hardcoded (enabled, threshold_value, etc.)
+            # No user input is used for column names, so this is NOT vulnerable to SQL injection.
             cur.execute(f"""
                 UPDATE alert_settings
                 SET {', '.join(updates)}

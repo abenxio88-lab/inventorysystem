@@ -3,6 +3,10 @@ QR Code Generation Module
 ==========================
 Generate QR codes and barcodes for products.
 Uses qrcode library (pure Python with Pillow).
+
+DEPRECATED: This module is superseded by barcode_system.py.
+The main application uses barcode_system.py for all barcode operations.
+This file is kept for reference and can be removed in a future cleanup.
 """
 
 import os

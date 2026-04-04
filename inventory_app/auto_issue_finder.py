@@ -18,10 +18,15 @@ def check_and_show_issues(root):
     Call this right after main window loads.
     """
     try:
-        from src.error_detector import detector, IssueSeverity
-        
+        # Try to import error detector - if not available, skip health check
+        try:
+            from src.error_detector import detector, IssueSeverity
+        except ImportError:
+            logger.info("Health check skipped - error_detector module not available")
+            return True
+
         issues = detector.check_all()
-        
+
         if not issues:
             logger.info("✅ System health check passed - no issues")
             return True
@@ -71,10 +76,27 @@ def add_health_check_to_button(root, notebook):
     Add health check functionality to existing health button.
     Shows issues in a nice formatted way.
     """
-    from src.error_detector import detector, IssueSeverity
-    
+    # Try to import error detector - if not available, show simple message
+    try:
+        from src.error_detector import detector, IssueSeverity
+        error_detector_available = True
+    except ImportError:
+        error_detector_available = False
+        logger.info("Health report disabled - error_detector module not available")
+
     def show_health_report():
         """Show health report in scrollable window."""
+        # If error detector not available, show simple message
+        if not error_detector_available:
+            messagebox.showinfo(
+                "🏥 System Health",
+                "⚠️ Health check is not fully available.\n\n"
+                "The error_detector module is missing.\n"
+                "Basic system checks cannot be performed.\n\n"
+                "Core application functionality is unaffected."
+            )
+            return
+
         issues = detector.check_all()
         
         if not issues:

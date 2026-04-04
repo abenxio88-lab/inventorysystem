@@ -250,18 +250,19 @@ def create_business_card(parent, dashboard_frame, switch_tab_callback: Optional[
 def bind_industry_shortcut(root, dashboard_frame=None):
     """
     Bind keyboard shortcut for industry selector (Ctrl+I)
-    
+
     Args:
         root: Root window
         dashboard_frame: Optional dashboard frame
     """
     def on_shortcut(event=None):
         """Handle Ctrl+I shortcut"""
-        def on_confirm(industry, verticals):
+        def on_confirm(industry_id):
+            # Callback expects single industry_id parameter
             # Refresh dashboard if available
             if dashboard_frame and hasattr(dashboard_frame, 'refresh'):
                 dashboard_frame.refresh()
-        
+
         open_industry_change_dialog(root, on_confirm=on_confirm)
     
     # Bind Ctrl+I

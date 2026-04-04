@@ -459,12 +459,58 @@ class RateLimiter:
     def reset(self, key: str):
         """
         Reset attempts for given key.
-        
+
         Args:
             key: Identifier to reset
         """
         if key in self.attempts:
             del self.attempts[key]
+
+    def get_remaining_attempts(self, key: str) -> int | None:
+        """
+        Get remaining attempts before lockout.
+
+        Args:
+            key: Identifier (username, etc.)
+
+        Returns:
+            Number of remaining attempts, or None if not tracking this key
+        """
+        import time
+        current_time = time.time()
+        if key not in self.attempts:
+            return self.max_attempts
+        # Clean expired attempts
+        self.attempts[key] = [
+            t for t in self.attempts[key]
+            if current_time - t < self.window_seconds
+        ]
+        return max(0, self.max_attempts - len(self.attempts[key]))
+
+    def get_wait_time(self, key: str) -> int:
+        """
+        Get seconds until lockout expires.
+
+        Args:
+            key: Identifier (username, etc.)
+
+        Returns:
+            Seconds to wait, or 0 if not locked out
+        """
+        import time
+        current_time = time.time()
+        if key not in self.attempts:
+            return 0
+        # Find oldest attempt in current window
+        valid_attempts = [
+            t for t in self.attempts[key]
+            if current_time - t < self.window_seconds
+        ]
+        if not valid_attempts or len(valid_attempts) < self.max_attempts:
+            return 0
+        # Wait until oldest attempt expires
+        oldest = min(valid_attempts)
+        return max(0, int(self.window_seconds - (current_time - oldest)))
 
 
 # ============================================================================

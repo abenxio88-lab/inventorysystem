@@ -239,6 +239,21 @@ def build_dashboard(root, username, role):
     # ── Industry vertical tabs ──────────────────────────────────────────
     add_industry_tabs(notebook, get_industry_type(), username)
 
+    # ── Status Bar (bottom of window) ──────────────────────────────────
+    try:
+        from status_widget import create_status_bar
+        status_bar = create_status_bar(root, "Mintaka Sphere IMS")
+        status_bar.pack(fill="x", side="bottom")
+    except Exception as exc:
+        logging.warning("Failed to load status bar: %s", exc)
+
+    # ── Keyboard Shortcuts ─────────────────────────────────────────────
+    try:
+        from business_settings import bind_industry_shortcut
+        bind_industry_shortcut(root, dashboard_frame=None)
+    except Exception as exc:
+        logging.warning("Failed to bind Ctrl+I shortcut: %s", exc)
+
     # ── Periodic stats ticker ───────────────────────────────────────────
     def update_stats():
         try:

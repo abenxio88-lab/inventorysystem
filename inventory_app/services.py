@@ -210,8 +210,14 @@ class InventoryService:
         if text.isdigit():
             return int(text)
 
-        # Name lookup fallback
-        table = "categories" if field_name == "category_id" else "suppliers"
+        # Name lookup fallback - only allow specific known tables (security: prevent SQL injection)
+        if field_name == "category_id":
+            table = "categories"
+        elif field_name == "supplier_id":
+            table = "suppliers"
+        else:
+            raise ValueError(f"Unsupported field for ID resolution: {field_name}")
+            
         try:
             from database import get_db_cursor
             with get_db_cursor() as cur:

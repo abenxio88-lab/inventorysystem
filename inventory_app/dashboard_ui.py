@@ -156,6 +156,16 @@ def create_dashboard_tab(parent, username, role, switch_tab_callback=None):
         industry_section = create_industry_selector_card(dashboard_frame, on_industry_changed=on_industry_changed)
         industry_section.pack(fill='x', pady=(0, 30))
 
+    # --- Business Configuration Card ---
+    try:
+        from business_settings import create_business_card
+        business_card = create_business_card(
+            dashboard_frame, dashboard_frame, switch_tab_callback
+        )
+        business_card.pack(fill='x', pady=(0, 30))
+    except ImportError:
+        logging.debug("Business settings card not available")
+
     # --- Quick Actions Section ---
     actions_frame = make_card(dashboard_frame, padx=25, pady=20)
     actions_frame.pack(fill='x', pady=(0, 30))
@@ -185,8 +195,10 @@ def create_dashboard_tab(parent, username, role, switch_tab_callback=None):
     styled_label(info_frame, overview_text, foreground=COLOR_TEXT_MUTED).pack(anchor='w')
     
     create_divider(info_frame, orientation="horizontal", color=COLOR_BORDER, thickness=1).pack(fill='x', pady=(15, 15))
-    
-    styled_label(info_frame, "📧 Support: usmansaeed.1988@gmail.com | 📱 +92-344-4560738", 
+
+    settings = load_settings()
+    support_email = settings.get("support_email", "support@mintakasphere.com")
+    styled_label(info_frame, f"📧 Support: {support_email} | Version 1.0.0",
                 font=FONT_SMALL, foreground=COLOR_TEXT_MUTED).pack(anchor='w')
     
     # --- Administrative Panel (Admins Only) ---
@@ -226,5 +238,32 @@ def create_dashboard_tab(parent, username, role, switch_tab_callback=None):
                 messagebox.showinfo("Settings", "Backup settings saved.")
 
         make_button(admin_controls, "⚙️ Settings", command=open_settings, kind="secondary").pack(side="left")
+
+        # System Health Check
+        try:
+            from auto_issue_finder import check_and_show_issues
+            make_button(admin_controls, "🩺 Health Check",
+                       command=lambda: check_and_show_issues(dashboard_frame),
+                       kind="secondary").pack(side="left", padx=(0, 15))
+        except ImportError:
+            pass
+
+        # Developer Dashboard
+        try:
+            from dev_dashboard import open_dev_dashboard
+            make_button(admin_controls, "🛠️ Dev Tools",
+                       command=lambda: open_dev_dashboard(dashboard_frame),
+                       kind="secondary").pack(side="left", padx=(0, 15))
+        except ImportError:
+            pass
+
+        # Error Dashboard
+        try:
+            from error_dashboard_widget import open_error_dashboard
+            make_button(admin_controls, "🚨 Error Dashboard",
+                       command=lambda: open_error_dashboard(dashboard_frame),
+                       kind="secondary").pack(side="left", padx=(0, 15))
+        except ImportError:
+            pass
 
     return dashboard_frame

@@ -11,7 +11,6 @@ to initialize the database.
 import pytest
 from pathlib import Path
 import sys
-import os
 
 # Add src and inventory_app to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))

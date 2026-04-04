@@ -140,11 +140,35 @@ class InventoryDB:
         return cls._instance
 
     # ── helpers ────────────────────────────────────────────
+    # Whitelist of allowed column names for each table (defense-in-depth)
+    _VALID_COLUMNS = {
+        "products": {"id", "model", "category", "supplier", "purchase_price", "selling_price",
+                     "stock", "reorder_point", "notes", "status", "created_at", "updated_at",
+                     "category_id", "supplier_id", "barcode", "sku", "description",
+                     "batch_no", "expiry_date", "serial_no", "warranty", "location_id"},
+        "sales": {"id", "product_id", "quantity", "price", "total", "customer_name",
+                  "sale_date", "notes", "created_at", "model", "month"},
+        "categories": {"id", "name", "description", "is_active", "created_at"},
+        "suppliers": {"id", "name", "contact", "address", "phone", "email", "is_active", "created_at"},
+        "locations": {"id", "name", "code", "type", "address", "city", "country", "capacity", "is_active"},
+        "customers": {"id", "name", "phone", "email", "address", "is_active", "created_at"},
+    }
+
     @staticmethod
-    def _sanitize_keys(keys):
+    def _sanitize_keys(keys, table: str = None):
+        """Validate column names to prevent SQL injection.
+        
+        Args:
+            keys: Column names to validate
+            table: Optional table name for whitelist validation
+        """
         for k in keys:
             if not str(k).isidentifier():
                 raise ValueError(f"Invalid column name: {k}")
+            # Extra defense-in-depth: check against whitelist if available
+            if table and table in InventoryDB._VALID_COLUMNS:
+                if k not in InventoryDB._VALID_COLUMNS[table]:
+                    raise ValueError(f"Unknown column '{k}' for table '{table}'")
 
     @staticmethod
     def _row_to_dict(row) -> dict:
@@ -184,7 +208,7 @@ class InventoryDB:
 
     def insert_product(self, data: dict) -> int:
         """Insert a new product. Returns the new product id."""
-        self._sanitize_keys(data.keys())
+        self._sanitize_keys(data.keys(), table="products")
         columns = ", ".join(data.keys())
         placeholders = ", ".join(["?"] * len(data))
         values = list(data.values())
@@ -200,7 +224,7 @@ class InventoryDB:
         """Update an existing product identified by model name."""
         if not data:
             return False
-        self._sanitize_keys(data.keys())
+        self._sanitize_keys(data.keys(), table="products")
         set_clause = ", ".join([f"{k} = ?" for k in data.keys()])
         values = list(data.values()) + [model]
         with get_db_cursor() as cur:
@@ -1069,13 +1093,37 @@ class InventoryDB:
         return json.dumps(data, indent=2, default=str)
 
     def import_from_json(self, json_data: str) -> bool:
-        """Import data from JSON backup."""
+        """Import data from JSON backup.
+        
+        Security: Only known tables are allowed to prevent SQL injection.
+        """
+        # Whitelist of tables that can be imported into
+        ALLOWED_TABLES = {
+            "products", "sales", "categories", "suppliers", "customers",
+            "locations", "invoices", "leases", "returns", "trade_ins",
+            "service_tickets", "serial_numbers", "stock_transfers",
+            "pharmacy_batches", "pharmacy_prescriptions", "settings",
+            "users", "audit_log", "alerts", "purchase_orders",
+            "sales_orders", "vertical_configs"
+        }
+        
         data = json.loads(json_data)
         with get_db_cursor() as cur:
             for table, rows in data.items():
+                # Security check: only allow known tables
+                if table not in ALLOWED_TABLES:
+                    logger.warning(f"Import skipped unknown table: {table}")
+                    continue
+                    
                 if not rows:
                     continue
+                    
+                # Validate column names
                 columns = list(rows[0].keys())
+                for col in columns:
+                    if not col.isidentifier():
+                        raise ValueError(f"Invalid column name in import: {col}")
+                        
                 placeholders = ','.join(['?' for _ in columns])
                 col_names = ','.join(columns)
                 for row in rows:

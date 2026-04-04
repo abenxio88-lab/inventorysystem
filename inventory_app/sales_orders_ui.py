@@ -10,7 +10,6 @@ from tkinter import ttk, messagebox
 import logging
 from datetime import datetime, timedelta
 
-from database import get_connection
 from ui_theme import (
     make_card, styled_label, make_button,
     FONT_HEADING, FONT_BOLD, FONT_REGULAR,

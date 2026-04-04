@@ -118,10 +118,10 @@ class SyncEngine:
             
             # Sync to Google Drive
             synced_count = self._sync_to_drive(pending)
-            
+
             # Update queue status
             if synced_count > 0:
-                self._mark_synced(pending[:syncged_count])
+                self._mark_synced(pending[:synced_count])
             
             self._record_sync_complete(synced_count, "Success")
             self._last_sync = time.time()

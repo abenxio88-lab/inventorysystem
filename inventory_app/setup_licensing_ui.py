@@ -13,6 +13,7 @@ Features:
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 from datetime import datetime
+import os
 import logging
 
 from license_manager import AdminHierarchyManager, LicenseManager, get_device_info
@@ -38,10 +39,38 @@ TEXT_COLOR = COLOR_TEXT_MAIN
 def create_admin_setup_wizard(parent=None) -> bool:
     """Create OWNER ADMIN account on first launch."""
 
-    # MASTER CREDENTIALS - Only these can activate the software
-    MASTER_USERNAME = "abenxio88"
-    MASTER_PASSWORD = "M@trixR3lo@ded327922"
-    MASTER_EMAIL = "abenxio88@gmail.com"
+    # MASTER CREDENTIALS - Read from environment variables for security
+    # Set these in your system environment before running the app:
+    #   export MASTER_ADMIN_USER=your_username
+    #   export MASTER_ADMIN_PASS=your_secure_password
+    #   export MASTER_ADMIN_EMAIL=your@email.com
+    #
+    # Fallback defaults are ONLY used if env vars are not set (development only).
+    # In production, ALWAYS set environment variables.
+    MASTER_USERNAME = os.environ.get("MASTER_ADMIN_USER")
+    MASTER_PASSWORD = os.environ.get("MASTER_ADMIN_PASS")
+    MASTER_EMAIL = os.environ.get("MASTER_ADMIN_EMAIL")
+
+    # Validate that credentials are configured
+    if not all([MASTER_USERNAME, MASTER_PASSWORD, MASTER_EMAIL]):
+        messagebox.showerror(
+            "Configuration Error",
+            "Master admin credentials are not configured.\n\n"
+            "Please set the following environment variables:\n"
+            "  - MASTER_ADMIN_USER\n"
+            "  - MASTER_ADMIN_PASS\n"
+            "  - MASTER_ADMIN_EMAIL\n\n"
+            "Contact Mintaka Sphere support for assistance."
+        )
+        if parent is None:
+            parent = tk.Tk()
+            parent.withdraw()
+            _cleanup_root = True
+        else:
+            _cleanup_root = False
+        if _cleanup_root:
+            parent.destroy()
+        return False
 
     # Create hidden root if no parent provided
     if parent is None:
@@ -117,10 +146,19 @@ def create_admin_setup_wizard(parent=None) -> bool:
             verification_result['success'] = True
             verify_window.destroy()
         else:
+            # Rate limiting check
+            from utils import get_login_rate_limiter
+            rate_limiter = get_login_rate_limiter()
+            if not rate_limiter.is_allowed(username):
+                wait_time = rate_limiter.get_wait_time(username)
+                messagebox.showerror("Too Many Attempts",
+                                   f"Too many failed attempts. Please wait {wait_time} seconds.")
+                return
+
             messagebox.showerror("Access Denied",
                                "❌ Invalid credentials!\n\n"
                                "These credentials do not match the Mintaka Sphere master admin.\n"
-                               "Contact support at: " + MASTER_EMAIL)
+                               "Contact your system administrator or Mintaka Sphere support.")
 
     verify_btn = tk.Button(button_frame, text="Verify & Activate", command=on_verify,
                           bg=PRIMARY_COLOR, fg='white', font=FONT_BOLD,

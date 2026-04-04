@@ -9,10 +9,8 @@ from ui_theme import (
     SUBHEADING_FONT, FONT_SMALL, create_divider, COLOR_TEXT_MAIN,
     COLOR_BORDER, COLOR_PRIMARY_LIGHT
 )
-
-# Simple single-user auth (requested)
-ADMIN_USERNAME = "admin"
-ADMIN_PASSWORD = "admin123"
+from database import verify_user_db
+from utils import get_login_rate_limiter
 
 def open_login(on_success, master=None):
     """
@@ -85,17 +83,43 @@ def open_login(on_success, master=None):
     password_entry.pack(fill="x", ipady=8)
 
     def login(event=None):
-        """Handles the login logic using a fixed admin credential."""
+        """Handles the login logic using database authentication with rate limiting."""
         username = username_entry.get().strip()
         password = password_entry.get()
 
-        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
-            logging.info("Login successful for admin")
+        if not username or not password:
+            messagebox.showwarning("Input Required", "Please enter both username and password.")
+            return
+
+        # Check rate limiting
+        rate_limiter = get_login_rate_limiter()
+        if not rate_limiter.is_allowed(username):
+            wait_time = rate_limiter.get_wait_time(username)
+            messagebox.showerror("Too Many Attempts",
+                               f"Too many failed login attempts for '{username}'.\n"
+                               f"Please wait {wait_time} seconds before trying again.")
+            return
+
+        # Authenticate against database
+        user_data = verify_user_db(username, password)
+        if user_data:
+            logging.info(f"Login successful for user: {username}")
+            rate_limiter.reset(username)  # Reset counter on success
             login_win.destroy()
-            on_success(username, "admin", master)
+            on_success(username, user_data.get("role", "staff"), master)
         else:
-            logging.warning("Login failed for provided credentials")
-            messagebox.showerror("Login Failed", "Invalid username or password")
+            logging.warning(f"Login failed for user: {username}")
+            rate_limiter.record_attempt(username)
+            remaining = rate_limiter.get_remaining_attempts(username)
+            if remaining is not None and remaining <= 0:
+                messagebox.showerror("Account Locked",
+                                   f"Account '{username}' has been locked due to too many failed attempts.\n"
+                                   f"Please wait before trying again.")
+            else:
+                msg = "Invalid username or password"
+                if remaining is not None:
+                    msg += f"\n({remaining} attempts remaining before lockout)"
+                messagebox.showerror("Login Failed", msg)
             password_entry.delete(0, tk.END)
 
     # --- Premium Login Button ---
@@ -113,22 +137,6 @@ def open_login(on_success, master=None):
     # --- Bindings ---
     username_entry.bind('<Return>', lambda e: password_entry.focus())
     password_entry.bind('<Return>', login)
-    
-    # Add hover effects to button
-    original_bg = COLOR_PRIMARY
-    hover_bg = COLOR_PRIMARY_LIGHT
-    
-    def on_enter(e):
-        try:
-            login_btn.configure(style="Primary.TButton")
-        except Exception:
-            pass
-    
-    def on_leave(e):
-        try:
-            login_btn.configure(style="Primary.TButton")
-        except Exception:
-            pass
 
     # --- Finalize Window ---
     center_window(login_win)
