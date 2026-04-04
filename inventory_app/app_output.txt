@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "e:\websites\inventorysystem\inventory_app\main_modern.py", line 35, in <module>
+    from ui_theme_modern import (
+    ...<2 lines>...
+    )
+  File "e:\websites\inventorysystem\inventory_app\ui_theme_modern.py", line 20, in <module>
+    from ctkmessagebox import CTkMessagebox
+ModuleNotFoundError: No module named 'ctkmessagebox'

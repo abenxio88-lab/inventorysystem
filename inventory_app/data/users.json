@@ -1,0 +1,10 @@
+{
+    "ali123": {
+        "hash": "pbkdf2:sha256:100000$d382bd36a0cc9f820158e1f42aa13925d19eac967102e2dde2ade51d859c1677$178d509b36296ff97337490aa225092b42c9dd5d4cf53fed842f5f49a1e662eb",
+        "pin_hash": "pbkdf2:sha256:100000$0e5c5c48742410812ec1ed9613b6704ba54b2e840a1f36949bdccda6390f7417$b0960a72a058a97b003c8e191ba443ad4a77c3b7b796fa48441734c8e1365820",
+        "salt": "",
+        "algo": "pbkdf2",
+        "role": "OWNER_ADMIN",
+        "iterations": 100000
+    }
+}

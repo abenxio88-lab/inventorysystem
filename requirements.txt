@@ -1,0 +1,79 @@
+# MS Inventory System - Dependencies
+# ===================================
+# Install: pip install -r requirements.txt
+
+# ============================================
+# MODERN UI FRAMEWORK
+# ============================================
+customtkinter>=5.2.0       # Modern UI framework (RECOMMENDED)
+darkdetect>=0.8.0          # Dark/light mode detection
+ctkmessagebox>=2.0.0       # Modern message boxes
+
+# Core Dependencies
+openpyxl>=3.1.2            # Excel export/import
+pyinstaller>=5.10.1        # Build executables
+matplotlib>=3.0.0          # Charts/graphs
+Pillow>=9.0.0              # Image processing
+argon2-cffi>=21.3.0        # Password hashing
+
+# QR & Barcode Generation
+qrcode[pil]>=7.4           # QR code generation
+python-barcode>=0.15.1     # Code128, EAN13 barcode generation
+
+# PDF Export
+reportlab>=4.0.0           # PDF generation
+
+# Configuration
+pyyaml>=6.0                # YAML config support
+
+# Database
+# SQLite is built into Python - no installation needed
+
+# ============================================
+# PHASE 1: OFFLINE-FIRST FOUNDATION
+# ============================================
+cryptography>=41.0.0       # Database encryption (AES-256)
+
+# ============================================
+# PHASE 2: GOOGLE DRIVE SYNC
+# ============================================
+google-auth>=2.23.0        # Google authentication
+google-auth-oauthlib>=1.1.0  # OAuth flow
+google-api-python-client>=2.100.0  # Google Drive API
+
+# ============================================
+# PHASE 3: QR/BARCODE SCANNING
+# ============================================
+pyzbar>=0.1.9              # Barcode/QR decoding
+opencv-python>=4.8.0       # Camera access & image processing
+
+# ============================================
+# Development Dependencies (Optional)
+# ============================================
+# Install with: pip install -r requirements-dev.txt
+
+# Testing
+# pytest>=7.0.0
+# pytest-cov>=4.0.0
+
+# Code Quality
+# black>=23.0.0
+# mypy>=1.0.0
+# pylint>=2.17.0
+# ruff>=0.1.0
+
+# ============================================
+# Optional Features
+# ============================================
+# Google Drive Sync
+# google-auth>=2.23.0
+# google-auth-oauthlib>=1.1.0
+# google-api-python-client>=2.100.0
+
+# Barcode Scanning
+# pyzbar>=0.1.9
+# opencv-python>=4.8.0
+
+# Additional UI Components (Optional)
+# ttkbootstrap>=1.10.0     # Bootstrap themes for Tkinter
+# tkcalendar>=1.6.1        # Date picker widget

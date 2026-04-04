@@ -1,0 +1,8 @@
+{
+    "executionEnvironments": [
+        {
+            "root": "inventory_app",
+            "extraPaths": ["inventory_app"]
+        }
+    ]
+}
