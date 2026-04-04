@@ -134,10 +134,10 @@ def create_smart_analytics_tab(parent, current_user=None):
             from ai_intelligence import AIDemandForecaster, SmartReorderEngine
             forecaster = AIDemandForecaster()
             forecasts = forecaster.forecast_all_products(forecast_days=30)
-            
+
             reorder_engine = SmartReorderEngine()
             reorders = reorder_engine.analyze_reorder_needs()
-            
+
             anomalies = [f for f in forecasts if f.get("stockout_risk") == "critical"]
 
             kpi_labels['reorder_items'].config(text=str(len(reorders)))
@@ -176,10 +176,20 @@ def create_smart_analytics_tab(parent, current_user=None):
                 ))
 
             logger.info("Smart analytics loaded")
-
         except Exception as e:
-            logger.exception(f"Failed to load insights: {e}")
-            messagebox.showerror("Error", f"Failed to load analytics: {e}")
+            # Graceful degradation: show empty state when tables/features unavailable
+            error_msg = str(e)
+            if "no such table" in error_msg.lower():
+                logger.info(f"AI analytics skipped - {error_msg}")
+                # Show user-friendly empty state
+                kpi_labels['reorder_items'].config(text="0")
+                kpi_labels['anomalies'].config(text="0")
+                forecast_list.delete(*forecast_list.get_children())
+                anomaly_list.delete(*anomaly_list.get_children())
+                reorder_list.delete(*reorder_list.get_children())
+                forecast_list.insert("", "end", values=("Feature unavailable", "N/A", "N/A", "Table not found"))
+            else:
+                logger.error(f"Failed to load insights: {e}")
 
     # Load initial data
     load_insights()

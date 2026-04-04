@@ -101,12 +101,12 @@ def open_login(on_success, master=None):
             return
 
         # Authenticate against database
-        user_data = verify_user_db(username, password)
-        if user_data:
+        success, role, user_id = verify_user_db(username, password)
+        if success:
             logging.info(f"Login successful for user: {username}")
             rate_limiter.reset(username)  # Reset counter on success
             login_win.destroy()
-            on_success(username, user_data.get("role", "staff"), master)
+            on_success(username, role, user_id, master)
         else:
             logging.warning(f"Login failed for user: {username}")
             rate_limiter.record_attempt(username)

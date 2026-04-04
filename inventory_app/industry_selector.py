@@ -65,9 +65,6 @@ def create_industry_selector_card(parent, on_industry_changed=None):
             if change_industry(iid):
                 if on_industry_changed:
                     on_industry_changed(iid)
-                cfg = get_config(iid)
-                messagebox.showinfo("Industry Updated",
-                                  f"Business mode set to {cfg['name']}.\nAll tabs and forms updated.")
             else:
                 messagebox.showerror("Error", "Failed to update industry setting.")
 

@@ -81,9 +81,9 @@ def create_invoicing_tab(parent, current_user=None):
     status_cb = combobox(toolbar, values=["All", "pending", "paid", "overdue"],
                          textvariable=status_var, state="readonly")
     status_cb.pack(side=tk.LEFT, padx=(0, 10))
-    status_cb.bind("<<ComboboxSelected>>", lambda e: refresh_from_db())
 
-    make_button(toolbar, "Refresh", command=refresh_from_db, kind="primary").pack(side=tk.LEFT)
+    refresh_btn = make_button(toolbar, "Refresh", kind="primary")
+    refresh_btn.pack(side=tk.LEFT)
 
     # Table
     table_frame = make_card(window, padx=10, pady=10)
@@ -142,6 +142,10 @@ def create_invoicing_tab(parent, current_user=None):
                 f"{inv.get('amount_paid', 0):,.2f}",
                 inv.get("status", ""),
             ))
+
+    # Now wire the combobox and button (after refresh_from_db is defined)
+    status_cb.bind("<<ComboboxSelected>>", lambda e: refresh_from_db())
+    refresh_btn.config(command=refresh_from_db)
 
     # Double-click to view/pay
     def on_double_click(event):

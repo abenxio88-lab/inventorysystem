@@ -1270,7 +1270,7 @@ def verify_user_db(username, password):
         # Verify password
         stored_hash = user['password_hash']
         salt = user['password_salt']
-        algo = user.get('password_algo', 'pbkdf2')
+        algo = user['password_algo'] if user['password_algo'] else 'pbkdf2'
         
         try:
             if algo == 'pbkdf2':
