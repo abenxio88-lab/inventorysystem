@@ -6,6 +6,7 @@ CLEANED UP: Removed stale cached data lists (low_stock_items, pending_orders,
 recent_sales) that were never refreshed and caused UI desynchronization.
 All data now reads directly from the database through the service layer.
 """
+import logging
 import tkinter as tk
 from tkinter import ttk
 from typing import Dict, Any, Callable, Optional
@@ -137,7 +138,7 @@ class AppState:
                     # Legacy: fire for every event
                     entry(event_type, data)
             except Exception as e:
-                print(f"UI Callback Error: {e}")
+                logging.error(f"UI Callback Error: {e}")
 
 
 class PremiumPopup(tk.Toplevel):

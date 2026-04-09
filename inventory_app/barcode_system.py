@@ -142,10 +142,10 @@ def save_product_qr(product: dict, output_path: str, with_label: bool = True) ->
         labeled_img.paste(qr_img, (0, 0))
         
         draw = ImageDraw.Draw(labeled_img)
-        
+
         try:
             font = ImageFont.truetype("arial.ttf", 14)
-        except:
+        except (OSError, IOError):
             font = ImageFont.load_default()
         
         text = f"{product.get('model', 'Unknown')}"
@@ -410,7 +410,8 @@ def scan_barcode_from_camera() -> Optional[dict]:
         try:
             cap.release()
             cv2.destroyAllWindows()
-        except:
+        except (NameError, Exception):
+            # NameError if cap not defined, Exception for cleanup failures
             pass
         return None
 
@@ -572,7 +573,7 @@ def validate_barcode(code: str, barcode_type: str) -> bool:
             even_sum = sum(digits[1::2])
             total = odd_sum + (even_sum * 3)
             return total % 10 == 0
-        except:
+        except (ValueError, TypeError):
             return False
     elif barcode_type == 'code128':
         return len(code) > 0

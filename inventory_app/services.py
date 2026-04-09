@@ -143,38 +143,32 @@ class InventoryService:
 
     def resolve_category_display(self, category_id) -> str:
         """Return human-friendly category text for tree/form.
-        
+
         This replaces direct SQL calls in the UI layer.
         """
         if category_id is None:
             return ""
         try:
             cid_int = int(category_id)
-            from database import get_db_cursor
-            with get_db_cursor() as cur:
-                cur.execute("SELECT name FROM categories WHERE id = ?", (cid_int,))
-                row = cur.fetchone()
-                if row and row.get("name"):
-                    return f"{row['name']} (ID: {cid_int})"
+            category = self.db.fetch_category_by_id(cid_int)
+            if category and category.get("name"):
+                return f"{category['name']} (ID: {cid_int})"
         except Exception:
             pass
         return str(category_id)
 
     def resolve_supplier_display(self, supplier_id) -> str:
         """Return human-friendly supplier text for tree/form.
-        
+
         This replaces direct SQL calls in the UI layer.
         """
         if supplier_id is None:
             return ""
         try:
             sid_int = int(supplier_id)
-            from database import get_db_cursor
-            with get_db_cursor() as cur:
-                cur.execute("SELECT name FROM suppliers WHERE id = ?", (sid_int,))
-                row = cur.fetchone()
-                if row and row.get("name"):
-                    return f"{row['name']} (ID: {sid_int})"
+            supplier = self.db.fetch_supplier_by_id(sid_int)
+            if supplier and supplier.get("name"):
+                return f"{supplier['name']} (ID: {sid_int})"
         except Exception:
             pass
         return str(supplier_id)
@@ -186,7 +180,7 @@ class InventoryService:
         - "Name (ID: 12)"
         - "12"
         - "Name" (resolved via DB)
-        
+
         This replaces direct SQL calls in the UI layer.
         """
         if raw_value is None:
@@ -217,14 +211,11 @@ class InventoryService:
             table = "suppliers"
         else:
             raise ValueError(f"Unsupported field for ID resolution: {field_name}")
-            
+
         try:
-            from database import get_db_cursor
-            with get_db_cursor() as cur:
-                cur.execute(f"SELECT id FROM {table} WHERE lower(name) = lower(?) LIMIT 1", (text,))
-                row = cur.fetchone()
-                if row and row.get("id") is not None:
-                    return int(row["id"])
+            result_id = self.db.fetch_id_by_name(table, text)
+            if result_id is not None:
+                return int(result_id)
         except Exception:
             pass
 

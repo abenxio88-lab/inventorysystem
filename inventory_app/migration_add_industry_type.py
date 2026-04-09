@@ -295,10 +295,10 @@ if __name__ == "__main__":
     )
     
     success = run_migration()
-    
+
     if success:
-        print("✅ Migration completed successfully!")
-        print(f"  Current Industry: {get_industry_type()}")
+        logging.info("Migration completed successfully!")
+        logging.info(f"Current Industry: {get_industry_type()}")
     else:
-        print("❌ Migration failed!")
+        logging.error("Migration failed!")
 

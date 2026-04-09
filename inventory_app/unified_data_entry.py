@@ -60,19 +60,20 @@ class IndustryConfig:
                     {'name': 'stock', 'type': 'number', 'label': 'Initial Stock', 'required': True, 'default': 0},
                     {'name': 'purchase_price', 'type': 'number', 'label': 'Purchase Price', 'required': True},
                     {'name': 'selling_price', 'type': 'number', 'label': 'Selling Price', 'required': True},
-                    
+
                     # Electronics-Specific Fields
                     {'name': 'serial_number', 'type': 'text', 'label': 'Serial Number', 'required': False, 'industry_only': True},
                     {'name': 'imei', 'type': 'text', 'label': 'IMEI', 'required': False, 'industry_only': True},
-                    {'name': 'ram_gb', 'type': 'number', 'label': 'RAM (GB)', 'required': False, 'industry_only': True},
-                    {'name': 'storage_gb', 'type': 'number', 'label': 'Storage (GB)', 'required': False, 'industry_only': True},
-                    {'name': 'screen_size', 'type': 'number', 'label': 'Screen Size (inches)', 'required': False, 'industry_only': True},
-                    {'name': 'camera_mp', 'type': 'number', 'label': 'Camera (MP)', 'required': False, 'industry_only': True},
-                    {'name': 'battery_mah', 'type': 'number', 'label': 'Battery (mAh)', 'required': False, 'industry_only': True},
-                    {'name': 'color', 'type': 'text', 'label': 'Color', 'required': False, 'industry_only': True},
-                    {'name': 'warranty_months', 'type': 'number', 'label': 'Warranty (Months)', 'required': False, 'industry_only': True},
+                    {'name': 'ram_gb', 'type': 'select', 'label': 'RAM (GB)', 'options': [2, 3, 4, 6, 8, 12, 16, 24, 32, 64], 'required': False, 'industry_only': True},
+                    {'name': 'storage_gb', 'type': 'select', 'label': 'Storage (GB)', 'options': [16, 32, 64, 128, 256, 512, 1024, 2048], 'required': False, 'industry_only': True},
+                    {'name': 'screen_type', 'type': 'select', 'label': 'Screen Type', 'options': ['OLED', 'AMOLED', 'Super AMOLED', 'Dynamic AMOLED', 'TFT', 'TFT LCD', 'IPS LCD', 'PLS LCD', 'LED', 'QLED', 'Mini-LED', 'MicroLED', 'E Ink', 'CRT', 'Other'], 'required': False, 'industry_only': True},
+                    {'name': 'screen_size', 'type': 'text', 'label': 'Screen Size (inches)', 'required': False, 'industry_only': True},
+                    {'name': 'camera_mp', 'type': 'select', 'label': 'Camera (MP)', 'options': [2, 5, 8, 12, 13, 16, 20, 24, 32, 48, 50, 64, 108, 200], 'required': False, 'industry_only': True},
+                    {'name': 'battery_mah', 'type': 'select', 'label': 'Battery (mAh)', 'options': [1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 6000, 7000, 8000, 10000, 20000], 'required': False, 'industry_only': True},
+                    {'name': 'color', 'type': 'select', 'label': 'Color', 'options': ['Black', 'White', 'Silver', 'Gold', 'Space Gray', 'Blue', 'Red', 'Green', 'Purple', 'Pink', 'Orange', 'Yellow', 'Gray', 'Rose Gold', 'Midnight Green', 'Pacific Blue', 'Sierra Blue', 'Alpine Green', 'Starlight', 'Graphite', 'Other'], 'required': False, 'industry_only': True},
+                    {'name': 'warranty_months', 'type': 'select', 'label': 'Warranty (Months)', 'options': [3, 6, 12, 18, 24, 36], 'required': False, 'industry_only': True},
                     {'name': 'warranty_expiry_date', 'type': 'date', 'label': 'Warranty Expiry', 'required': False, 'industry_only': True},
-                    {'name': 'device_condition', 'type': 'select', 'label': 'Condition', 'options': ['New', 'Refurbished', 'Used', 'Damaged'], 'required': False, 'industry_only': True},
+                    {'name': 'device_condition', 'type': 'select', 'label': 'Condition', 'options': ['New', 'Refurbished', 'Used', 'Like New', 'Good', 'Fair', 'Poor', 'Damaged', 'For Parts'], 'required': False, 'industry_only': True},
                 ]
             },
             'features': ['warranty_tracking', 'serial_tracking', 'imei_tracking', 'service_management']
@@ -92,15 +93,15 @@ class IndustryConfig:
                     {'name': 'stock', 'type': 'number', 'label': 'Initial Stock', 'required': True, 'default': 0},
                     {'name': 'purchase_price', 'type': 'number', 'label': 'Purchase Price', 'required': True},
                     {'name': 'selling_price', 'type': 'number', 'label': 'Selling Price', 'required': True},
-                    
+
                     # Pharmacy-Specific Fields
                     {'name': 'batch_number', 'type': 'text', 'label': 'Batch Number', 'required': False, 'industry_only': True},
                     {'name': 'expiry_date', 'type': 'date', 'label': 'Expiry Date', 'required': False, 'industry_only': True},
                     {'name': 'manufacturer', 'type': 'text', 'label': 'Manufacturer', 'required': False, 'industry_only': True},
                     {'name': 'dosage', 'type': 'text', 'label': 'Dosage', 'required': False, 'industry_only': True},
-                    {'name': 'form', 'type': 'select', 'label': 'Form', 'options': ['Tablet', 'Capsule', 'Syrup', 'Injection', 'Cream', 'Ointment'], 'required': False, 'industry_only': True},
-                    {'name': 'requires_prescription', 'type': 'boolean', 'label': 'Requires Prescription', 'required': False, 'industry_only': True},
-                    {'name': 'storage_temp', 'type': 'text', 'label': 'Storage Temperature', 'required': False, 'industry_only': True},
+                    {'name': 'form', 'type': 'select', 'label': 'Form', 'options': ['Tablet', 'Capsule', 'Syrup', 'Injection', 'Cream', 'Ointment', 'Powder', 'Drop', 'Spray', 'Patch', 'Suppository', 'Inhaler', 'Liquid', 'Gel', 'Lozenge'], 'required': False, 'industry_only': True},
+                    {'name': 'requires_prescription', 'type': 'select', 'label': 'Requires Prescription', 'options': ['Yes', 'No'], 'required': False, 'industry_only': True},
+                    {'name': 'storage_temp', 'type': 'select', 'label': 'Storage Temperature', 'options': ['Room Temp (15-25°C)', 'Refrigerated (2-8°C)', 'Freezer (-20°C)', 'Cool (8-15°C)', 'Controlled Room (20-25°C)'], 'required': False, 'industry_only': True},
                     {'name': 'generic_name', 'type': 'text', 'label': 'Generic Name', 'required': False, 'industry_only': True},
                 ]
             },
@@ -281,10 +282,8 @@ class DynamicFormBuilder:
         
         row = 0
         for field in self.field_configs:
-            # Skip industry-only fields if not matching current industry
-            if field.get('industry_only') and self.industry_type != field.get('for_industry'):
-                continue
-            
+            # get_fields() already returns only fields for this industry
+            # No need to filter again
             widget = self._create_field_widget(container, field, row)
             if widget:
                 self.widgets[field['name']] = widget
@@ -375,9 +374,7 @@ class DynamicFormBuilder:
         row = 0
 
         for field in self.field_configs:
-            # Skip industry-only fields
-            if field.get('industry_only') and self.industry_type != field.get('for_industry'):
-                continue
+            # All fields already filtered by industry type via get_fields()
 
             # Label
             lbl = styled_label(parent, text=f"{field['label']}:")
@@ -443,7 +440,7 @@ class DynamicFormBuilder:
                     # Fallback for complex widgets or vars
                     pass
             except Exception as e:
-                print(f"Error getting value for {name}: {e}")
+                logging.debug(f"Error getting value for {name}: {e}")
                 values[name] = ""
 
         return values

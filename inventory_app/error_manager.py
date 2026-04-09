@@ -19,23 +19,7 @@ import threading
 import traceback
 from datetime import datetime
 from typing import Optional, Dict, Any, List, Callable
-from pathlib import Path
 from contextlib import contextmanager
-
-# Try to import customtkinter for UI notifications
-try:
-    import customtkinter as ctk
-    CTk_AVAILABLE = True
-except ImportError:
-    CTk_AVAILABLE = False
-
-# Try to import standard tkinter
-try:
-    import tkinter as tk
-    from tkinter import messagebox
-    TK_AVAILABLE = True
-except ImportError:
-    TK_AVAILABLE = False
 
 
 # ============================================================================
@@ -79,11 +63,11 @@ class AppError:
         self.message = message
         self.severity = severity
         self.exception = exception
-        self.context = context or {}
+        self.context = context if context is not None else {}
         self.traceback = traceback.format_exc() if exception else None
-        self.module = context.get('module', 'Unknown')
-        self.function = context.get('function', 'Unknown')
-        self.user_action = context.get('user_action', 'Unknown')
+        self.module = self.context.get('module', 'Unknown')
+        self.function = self.context.get('function', 'Unknown')
+        self.user_action = self.context.get('user_action', 'Unknown')
         self.resolved = False
         self.resolved_at = None
         
@@ -105,7 +89,7 @@ class AppError:
         }
     
     def __str__(self) -> str:
-        return f"[{self.severity.upper()}] {self.message}"
+        return f"[{self.severity.upper()}] {self.timestamp.strftime('%H:%M:%S')} {self.module}.{self.function}: {self.message}"
 
 
 # ============================================================================
@@ -117,44 +101,43 @@ class ErrorManager:
     Centralized error management system.
     Catches, logs, displays, and tracks all errors.
     """
-    
+
     _instance: Optional['ErrorManager'] = None
     _lock = threading.Lock()
-    
+    _init_lock = threading.Lock()
+
     def __new__(cls) -> 'ErrorManager':
         """Singleton pattern - only one error manager."""
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
-                    cls._instance = super().__new__(cls)
-                    cls._instance._initialized = False
+                    instance = super().__new__(cls)
+                    instance._initialized = False
+                    cls._instance = instance
         return cls._instance
-    
+
     def __init__(self):
-        if self._initialized:
-            return
-            
-        self._initialized = True
-        self.errors: List[AppError] = []
-        self.callbacks: List[Callable[[AppError], None]] = []
-        self.error_count = 0
-        self.critical_count = 0
-        self.warning_count = 0
-        
-        # Setup logging
-        self._setup_logging()
-        
-        # Auto-display settings
-        self.auto_display = True  # Show errors immediately during development
-        self.display_threshold = 'warning'  # Display warnings and above
-        
-        # Max errors to keep in memory
-        self.max_errors = 1000
-        
-        # Error log file
-        self.log_file = self._get_log_file_path()
-        
-        print(f"[OK] Error Manager initialized - Log file: {self.log_file}")
+        with self._init_lock:
+            if self._initialized:
+                return
+
+            self._initialized = True
+            self.errors: List[AppError] = []
+            self.callbacks: List[Callable[[AppError], None]] = []
+            self.error_count = 0
+            self.critical_count = 0
+            self.warning_count = 0
+
+            # Setup logging
+            self._setup_logging()
+
+            # Max errors to keep in memory
+            self.max_errors = 1000
+
+            # Error log file
+            self.log_file = self._get_log_file_path()
+
+            logging.info(f"Error Manager initialized - Log file: {self.log_file}")
     
     def _setup_logging(self):
         """Setup dedicated error logging."""
@@ -179,8 +162,12 @@ class ErrorManager:
         try:
             from utils import get_data_dir
             data_dir = get_data_dir()
-        except:
-            data_dir = os.path.join(os.path.dirname(__file__), 'data')
+        except (ImportError, ModuleNotFoundError):
+            try:
+                from .utils import get_data_dir
+                data_dir = get_data_dir()
+            except (ImportError, ModuleNotFoundError):
+                data_dir = os.path.join(os.path.dirname(__file__), 'data')
         
         os.makedirs(data_dir, exist_ok=True)
         
@@ -215,28 +202,29 @@ class ErrorManager:
                         f.write(f"{key}: {value}\n")
                 
                 f.write("="*80 + "\n")
-                
+
         except Exception as e:
-            print(f"Failed to write error to log file: {e}")
+            logging.error(f"Failed to write error to log file: {e}")
     
     def handle(self, error: AppError):
         """
         Handle an error - log, display, and notify.
-        
+
         This is the MAIN method to report errors.
         """
-        # Add to error list
-        self.errors.append(error)
-        self.error_count += 1
-        
-        if error.severity == ErrorSeverity.CRITICAL:
-            self.critical_count += 1
-        elif error.severity == ErrorSeverity.WARNING:
-            self.warning_count += 1
-        
-        # Keep only recent errors
-        if len(self.errors) > self.max_errors:
-            self.errors = self.errors[-self.max_errors:]
+        with self._lock:
+            # Add to error list
+            self.errors.append(error)
+            self.error_count += 1
+
+            if error.severity == ErrorSeverity.CRITICAL:
+                self.critical_count += 1
+            elif error.severity == ErrorSeverity.WARNING:
+                self.warning_count += 1
+
+            # Keep only recent errors
+            if len(self.errors) > self.max_errors:
+                self.errors = self.errors[-self.max_errors:]
         
         # Write to log file
         self._write_to_log_file(error)
@@ -251,96 +239,84 @@ class ErrorManager:
             self.logger.warning(log_message)
         else:
             self.logger.info(log_message)
-        
-        # Display UI notification if enabled
-        if self.auto_display and self._should_display(error.severity):
-            self._display_error(error)
-        
+
         # Notify callbacks (for dashboard widget)
         self._notify_callbacks(error)
-    
-    def _should_display(self, severity: str) -> bool:
-        """Check if error should be displayed."""
-        display_order = ['info', 'warning', 'error', 'critical']
-        threshold_idx = display_order.index(self.display_threshold)
-        error_idx = display_order.index(severity)
-        return error_idx >= threshold_idx
-    
-    def _display_error(self, error: AppError):
-        """Display error in UI (will be called from main thread)."""
-        # For now, just print - will be connected to UI later
-        print(f"\n{'!'*60}")
-        print(f"{ErrorSeverity.ICONS.get(error.severity)} ERROR DETECTED!")
-        print(f"{'!'*60}")
-        print(f"Message: {error.message}")
-        print(f"Module: {error.module}")
-        print(f"Function: {error.function}")
-        if error.traceback:
-            print(f"\nStack Trace (last 10 lines):")
-            for line in error.traceback.split('\n')[-10:]:
-                print(f"  {line}")
-        print(f"{'!'*60}\n")
-    
+
     def _notify_callbacks(self, error: AppError):
         """Notify all registered callbacks."""
-        for callback in self.callbacks:
+        with self._lock:
+            callbacks_copy = self.callbacks[:]
+
+        for callback in callbacks_copy:
             try:
                 callback(error)
             except Exception as e:
-                print(f"Error callback failed: {e}")
-    
+                logging.error(f"Error callback failed: {e}")
+
     def register_callback(self, callback: Callable[[AppError], None]):
         """Register a callback to be notified of errors."""
-        self.callbacks.append(callback)
-    
+        with self._lock:
+            self.callbacks.append(callback)
+
     def unregister_callback(self, callback: Callable[[AppError], None]):
         """Unregister a callback."""
-        if callback in self.callbacks:
-            self.callbacks.remove(callback)
+        with self._lock:
+            if callback in self.callbacks:
+                self.callbacks.remove(callback)
     
     def get_errors(self, severity: Optional[str] = None,
                    resolved: Optional[bool] = None,
                    limit: int = 50) -> List[AppError]:
         """Get errors with optional filtering."""
-        filtered = self.errors
-        
+        with self._lock:
+            filtered = self.errors[:]
+
         if severity:
             filtered = [e for e in filtered if e.severity == severity]
-        
+
         if resolved is not None:
             filtered = [e for e in filtered if e.resolved == resolved]
-        
+
         # Sort by timestamp (newest first)
         filtered.sort(key=lambda e: e.timestamp, reverse=True)
-        
+
         return filtered[:limit]
     
     def get_error_summary(self) -> Dict[str, Any]:
         """Get error statistics."""
+        with self._lock:
+            unresolved = sum(1 for e in self.errors if not e.resolved)
+            total = self.error_count
+            critical = self.critical_count
+            warning = self.warning_count
+
         return {
-            'total_errors': self.error_count,
-            'critical': self.critical_count,
-            'error': self.error_count - self.warning_count - self.critical_count,
-            'warning': self.warning_count,
-            'unresolved': len([e for e in self.errors if not e.resolved]),
+            'total_errors': total,
+            'critical': critical,
+            'error': total - warning - critical,
+            'warning': warning,
+            'unresolved': unresolved,
             'log_file': self.log_file
         }
     
     def mark_resolved(self, error_id: str):
         """Mark an error as resolved."""
-        for error in self.errors:
-            if error.id == error_id:
-                error.resolved = True
-                error.resolved_at = datetime.now()
-                print(f"[OK] Error {error_id} marked as resolved")
-                return True
+        with self._lock:
+            for error in self.errors:
+                if error.id == error_id:
+                    error.resolved = True
+                    error.resolved_at = datetime.now()
+                    logging.info(f"Error {error_id} marked as resolved")
+                    return True
         return False
-    
+
     def clear_resolved(self):
         """Clear all resolved errors from memory."""
-        self.errors = [e for e in self.errors if not e.resolved]
-        print(f"[OK] Cleared resolved errors")
-    
+        with self._lock:
+            self.errors = [e for e in self.errors if not e.resolved]
+        logging.info("Cleared resolved errors")
+
     def export_errors(self, filepath: Optional[str] = None) -> str:
         """Export errors to JSON file."""
         if filepath is None:
@@ -348,15 +324,18 @@ class ErrorManager:
                 os.path.dirname(self.log_file),
                 f'errors_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
             )
-        
+
+        with self._lock:
+            errors_copy = self.errors[:]
+
         try:
             with open(filepath, 'w', encoding='utf-8') as f:
-                json.dump([e.to_dict() for e in self.errors], f, indent=2)
-            
-            print(f"[OK] Exported {len(self.errors)} errors to {filepath}")
+                json.dump([e.to_dict() for e in errors_copy], f, indent=2)
+
+            logging.info(f"Exported {len(self.errors)} errors to {filepath}")
             return filepath
         except Exception as e:
-            print(f"Failed to export errors: {e}")
+            logging.error(f"Failed to export errors: {e}")
             return ""
 
 
@@ -483,7 +462,7 @@ def install_global_hook():
         if issubclass(exc_type, KeyboardInterrupt):
             original_hook(exc_type, exc_value, exc_traceback)
             return
-        
+
         error = AppError(
             message=f"Unhandled exception: {str(exc_value)}",
             severity='critical',
@@ -493,10 +472,9 @@ def install_global_hook():
                 'user_action': 'Unhandled exception'
             }
         )
-        
+
         # Format traceback
-        import traceback as tb
-        error.traceback = ''.join(tb.format_exception(exc_type, exc_value, exc_traceback))
+        error.traceback = ''.join(traceback.format_exception(exc_type, exc_value, exc_traceback))
         
         get_error_manager().handle(error)
         
@@ -504,7 +482,7 @@ def install_global_hook():
         original_hook(exc_type, exc_value, exc_traceback)
     
     sys.excepthook = global_hook
-    print("[OK] Global error hook installed")
+    logging.info("Global error hook installed")
 
 
 # ============================================================================

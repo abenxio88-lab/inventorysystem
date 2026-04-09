@@ -33,7 +33,7 @@ DB_FILE = os.path.join(get_data_dir(), "inventory.db")
 _local = threading.local()
 
 # Schema version for migrations
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 logger = logging.getLogger(__name__)
 
@@ -142,10 +142,28 @@ class InventoryDB:
     # ── helpers ────────────────────────────────────────────
     # Whitelist of allowed column names for each table (defense-in-depth)
     _VALID_COLUMNS = {
-        "products": {"id", "model", "category", "supplier", "purchase_price", "selling_price",
-                     "stock", "reorder_point", "notes", "status", "created_at", "updated_at",
-                     "category_id", "supplier_id", "barcode", "sku", "description",
-                     "batch_no", "expiry_date", "serial_no", "warranty", "location_id"},
+        "products": {
+            # Basic fields (all industries)
+            "id", "model", "category", "supplier", "purchase_price", "selling_price",
+            "stock", "reorder_point", "notes", "status", "created_at", "updated_at",
+            "category_id", "supplier_id", "barcode", "sku", "description", "location_id",
+            # Electronics-specific fields
+            "serial_number", "serial_no", "imei",
+            "ram", "ram_gb", "storage", "storage_gb",
+            "screen_type", "screen_size",
+            "camera", "camera_mp",
+            "battery", "battery_mah",
+            "color", "warranty_months", "warranty_expiry", "warranty_expiry_date",
+            "device_condition", "condition",
+            # Pharmacy-specific fields
+            "batch_no", "batch_number", "expiry_date", "manufacturer",
+            "dosage_form", "strength",
+            # Location/warehouse fields
+            "default_location_id", "rack_location", "shelf_location",
+            # Additional fields
+            "brand", "qr_code", "cost_avg", "max_stock", "min_stock",
+            "images", "specifications", "created_by"
+        },
         "sales": {"id", "product_id", "quantity", "price", "total", "customer_name",
                   "sale_date", "notes", "created_at", "model", "month"},
         "categories": {"id", "name", "description", "is_active", "created_at"},
@@ -581,9 +599,9 @@ class InventoryDB:
             return True
 
     def get_industry_type(self) -> str:
-        """Return the current industry type (e.g. 'retail', 'pharma')."""
+        """Return the current industry type (e.g. 'electronics', 'retail', 'pharma')."""
         val = self.get_setting("industry_type")
-        return val if val else "retail"
+        return val if val else "electronics"  # Default to electronics
 
     def set_industry_type(self, industry: str) -> bool:
         return self.set_setting("industry_type", industry, "general", "Current industry type")
@@ -1072,6 +1090,40 @@ class InventoryDB:
             cur.execute("SELECT last_insert_rowid()")
             return cur.fetchone()[0]
 
+    def fetch_category_by_id(self, category_id: int) -> Optional[dict]:
+        """Fetch a category by ID."""
+        with get_db_cursor() as cur:
+            cur.execute("SELECT * FROM categories WHERE id = ?", (category_id,))
+            row = cur.fetchone()
+            if row:
+                return dict(row)
+            return None
+
+    def fetch_supplier_by_id(self, supplier_id: int) -> Optional[dict]:
+        """Fetch a supplier by ID."""
+        with get_db_cursor() as cur:
+            cur.execute("SELECT * FROM suppliers WHERE id = ?", (supplier_id,))
+            row = cur.fetchone()
+            if row:
+                return dict(row)
+            return None
+
+    def fetch_id_by_name(self, table: str, name: str) -> Optional[int]:
+        """Fetch an ID by name from a specified table (case-insensitive).
+        
+        Only allows specific tables for security (prevents SQL injection).
+        """
+        # Whitelist of allowed tables
+        if table not in ('categories', 'suppliers', 'customers', 'products'):
+            raise ValueError(f"Table '{table}' not allowed for name lookup")
+        
+        with get_db_cursor() as cur:
+            cur.execute(f"SELECT id FROM {table} WHERE lower(name) = lower(?) LIMIT 1", (name,))
+            row = cur.fetchone()
+            if row:
+                return row[0]
+            return None
+
     # ── EXPORT / IMPORT ───────────────────────────────────
 
     def export_to_json(self) -> str:
@@ -1304,6 +1356,22 @@ def verify_user_db(username, password):
             return False, None, None
 
 
+def ensure_default_admin():
+    """Create default admin user if it doesn't already exist."""
+    with get_db_cursor() as cur:
+        cur.execute("SELECT id FROM users WHERE username = 'admin'")
+        if cur.fetchone():
+            return  # Admin already exists
+
+    try:
+        user_id = create_user_db("admin", "admin123", role="admin", full_name="System Administrator")
+        logging.info(f"Default admin user created with ID {user_id}")
+    except ValueError:
+        logging.info("Admin user already exists (possible race condition)")
+    except Exception as e:
+        logging.error(f"Failed to create default admin user: {e}")
+
+
 def list_users_db(active_only=True):
     """
     List all users from the database.
@@ -1454,7 +1522,7 @@ def init_database():
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP)""")
         cur.execute("SELECT id FROM settings WHERE key = 'industry_type'")
         if not cur.fetchone():
-            cur.execute("INSERT INTO settings (key, value) VALUES ('industry_type', 'retail')")
+            cur.execute("INSERT INTO settings (key, value) VALUES ('industry_type', 'electronics')")
 
         # Users
         cur.execute("""CREATE TABLE users (
@@ -1500,7 +1568,7 @@ def init_database():
             purchase_price REAL DEFAULT 0, selling_price REAL DEFAULT 0, cost_avg REAL DEFAULT 0,
             stock INTEGER DEFAULT 0, min_stock INTEGER DEFAULT 5, reorder_point INTEGER DEFAULT 10,
             max_stock INTEGER, brand TEXT, serial_number TEXT, ram TEXT, storage TEXT,
-            screen_size TEXT, camera TEXT, battery TEXT, color TEXT,
+            screen_type TEXT, screen_size TEXT, camera TEXT, battery TEXT, color TEXT,
             warranty_months INTEGER, warranty_expiry TEXT,
             expiry_date TEXT, batch_number TEXT, manufacturer TEXT,
             dosage_form TEXT, strength TEXT,
@@ -1913,6 +1981,16 @@ def migrate_database():
                 except Exception as e:
                     logging.warning(f"Failed to create index: {e}")
             logging.info("Added performance indexes for version 3")
+
+        if current_version < 4:
+            try:
+                cur.execute("PRAGMA table_info(products)")
+                columns = [col[1] for col in cur.fetchall()]
+                if 'screen_type' not in columns:
+                    cur.execute("ALTER TABLE products ADD COLUMN screen_type TEXT")
+                    logging.info("Added screen_type column to products table")
+            except Exception as e:
+                logging.warning(f"Migration screen_type check failed: {e}")
 
         cur.execute("UPDATE schema_version SET version = ?", (max(current_version, SCHEMA_VERSION),))
         logging.info(f"Database migrated to version {max(current_version, SCHEMA_VERSION)}")

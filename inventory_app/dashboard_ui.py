@@ -32,106 +32,163 @@ def create_dashboard_tab(parent, username, role, switch_tab_callback=None):
     dashboard_frame = ttk.Frame(parent, padding=30)
 
     # --- Header Information ---
-    industry_id = get_industry_type()
-    meta = get_industry_metadata(industry_id)
+    from config import get_industry_config, get_default_industry
+    
+    # Get industry config (from DB or default)
+    try:
+        from database import db
+        industry_id = db.get_industry_type()
+    except Exception:
+        logging.warning("Failed to get industry from DB, using default")
+        industry_id = get_default_industry()
+    
+    config = get_industry_config(industry_id)
 
     # --- Premium Header ---
     header_frame = ttk.Frame(dashboard_frame)
     header_frame.pack(fill='x', pady=(0, 30))
-    
+
     # Left side: Welcome & Role
     user_info_frame = ttk.Frame(header_frame)
     user_info_frame.pack(side="left", fill="x", expand=True)
-    
+
     welcome_label = styled_label(user_info_frame, f"Welcome back, {username.capitalize()}", font=FONT_HEADING, foreground=COLOR_PRIMARY)
     welcome_label.pack(anchor="w")
-    
+
     role_info_frame = ttk.Frame(user_info_frame)
     role_info_frame.pack(anchor="w", pady=(5, 0))
-    
+
     styled_label(role_info_frame, f"Role: {role.upper()}", font=FONT_SMALL, foreground=COLOR_TEXT_MUTED).pack(side="left")
-    
-    # Right side: Current Industry Badge (ensure it has space)
+
+    # Right side: Current Industry Badge (from config)
     badge_container = ttk.Frame(header_frame)
     badge_container.pack(side="right", anchor="n", padx=(10, 0))
-    
+
     industry_badge = create_status_badge(
-        badge_container, 
-        text=meta['name'].upper(), 
-        icon=meta.get('icon', '🏢'),
-        color=meta.get('color', COLOR_PRIMARY)
+        badge_container,
+        text=config.industry_name.upper(),
+        icon=config.icon,
+        color=config.color
     )
     industry_badge.pack()
-    
+
     create_divider(dashboard_frame, orientation="horizontal", color=COLOR_BORDER, thickness=1).pack(fill='x', pady=(0, 30))
-    
-    # --- PREMIUM STATS CARDS ---
-    stats_frame = ttk.Frame(dashboard_frame)
-    stats_frame.pack(fill='x', pady=(0, 40))
-    
+
+    # --- PREMIUM STATS CARDS (config-driven) ---
+    stats_canvas_frame = ttk.Frame(dashboard_frame)
+    stats_canvas_frame.pack(fill='x', pady=(0, 40))
+
     label_refs = {}
 
-    card_configs = [
-        {"id": "products", "title": "📦 Products", "value": "...", "color": COLOR_PRIMARY, "icon": "📦", "tab": "Inventory"},
-        {"id": "stock", "title": "📊 Total Stock", "value": "...", "color": COLOR_INFO, "icon": "📊", "tab": "Inventory"},
-        {"id": "low_stock", "title": "⚠️ Low Stock", "value": "...", "color": COLOR_SUCCESS, "icon": "⚠️", "tab": "Inventory"},
-        {"id": "sales", "title": "💰 Sales", "value": "...", "color": "#10B981", "icon": "💸", "tab": "Sales"},
-    ]
-    
-    industry_id = get_industry_type()
+    # Build KPI cards from industry config
+    # Each industry can define its own KPI structure
     if industry_id == "electronics":
-        card_configs.append({"id": "electronics", "title": "📱 Electronics", "value": "...", "color": "#8B5CF6", "icon": "📱", "tab": "Electronics"})
+        # Electronics KPIs
+        card_configs = [
+            {"id": "products", "title": "📦 Products", "value": "...", "color": COLOR_PRIMARY, "icon": "📦", "tab": "Inventory"},
+            {"id": "stock", "title": "📊 Total Stock", "value": "...", "color": COLOR_INFO, "icon": "📊", "tab": "Inventory"},
+            {"id": "warranty", "title": "⚠️ Expiring Warranty", "value": "...", "color": COLOR_DANGER, "icon": "🔧", "tab": "Warranty"},
+            {"id": "sales", "title": "💰 Sales", "value": "...", "color": "#10B981", "icon": "💸", "tab": "Sales"},
+        ]
     elif industry_id == "pharma":
-        card_configs.append({"id": "pharma", "title": "💊 Expiring", "value": "...", "color": "#EF4444", "icon": "💊", "tab": "Pharma"})
-    
-    for config in card_configs:
-        card_container = ttk.Frame(stats_frame)
+        # Pharma KPIs
+        card_configs = [
+            {"id": "products", "title": "📦 Products", "value": "...", "color": COLOR_PRIMARY, "icon": "📦", "tab": "Inventory"},
+            {"id": "expired", "title": "❌ Expired", "value": "...", "color": COLOR_DANGER, "icon": "💀", "tab": "Expiry Alerts"},
+            {"id": "expiring", "title": "⚠️ Expiring Soon", "value": "...", "color": COLOR_WARNING, "icon": "⏰", "tab": "Expiry Alerts"},
+            {"id": "sales", "title": "💰 Sales", "value": "...", "color": "#10B981", "icon": "💸", "tab": "Sales"},
+        ]
+    else:
+        # Retail/Default KPIs
+        card_configs = [
+            {"id": "products", "title": "📦 Products", "value": "...", "color": COLOR_PRIMARY, "icon": "📦", "tab": "Inventory"},
+            {"id": "stock", "title": "📊 Total Stock", "value": "...", "color": COLOR_INFO, "icon": "📊", "tab": "Inventory"},
+            {"id": "low_stock", "title": "⚠️ Low Stock", "value": "...", "color": COLOR_SUCCESS, "icon": "⚠️", "tab": "Inventory"},
+            {"id": "sales", "title": "💰 Sales", "value": "...", "color": "#10B981", "icon": "💸", "tab": "Sales"},
+        ]
+
+    # Create stats cards with responsive layout
+    for idx, config in enumerate(card_configs):
+        card_container = ttk.Frame(stats_canvas_frame)
         card_container.pack(side="left", expand=True, fill="both", padx=(0, 15))
-        
+
         card = make_card(card_container, padx=25, pady=25)
         card.pack(fill="both", expand=True)
-        
+
         icon_label = styled_label(card, config["icon"], font=("Segoe UI", 32))
         icon_label.pack(pady=(0, 10))
-        
+
         styled_label(card, config["title"].split(" ", 1)[-1], font=FONT_SMALL, foreground=COLOR_TEXT_MUTED).pack()
-        
+
         value_label = styled_label(card, config["value"], font=FONT_HEADING, foreground=config["color"])
         value_label.pack(pady=(5, 0))
         label_refs[config["id"]] = value_label
-        
+
         if switch_tab_callback:
             def make_nav(target): return lambda e: switch_tab_callback(target)
             card.bind("<Button-1>", make_nav(config["tab"]))
             for w in card.winfo_children(): w.bind("<Button-1>", make_nav(config["tab"]))
 
     def refresh_dashboard_kpis(*args):
+        """Dynamic KPI refresh - reads from industry-specific service."""
         try:
             products = svc.inventory.get_all_products(active_only=True)
             orders = svc.sales.get_all_orders()
             total_items = sum(int(p.get('stock', 0)) for p in products)
             low_stock = len([p for p in products if int(p.get('stock', 0)) <= p.get('reorder_point', 5)])
             total_sales = len(orders)
-            
+
+            # Update base KPIs (all industries)
             if "products" in label_refs: label_refs["products"].config(text=str(len(products)))
             if "stock" in label_refs: label_refs["stock"].config(text=str(total_items))
-            if "low_stock" in label_refs: 
+            if "low_stock" in label_refs:
                 label_refs["low_stock"].config(text=str(low_stock), foreground=COLOR_DANGER if low_stock > 0 else COLOR_SUCCESS)
             if "sales" in label_refs: label_refs["sales"].config(text=str(total_sales))
-            
-            if industry_id == "electronics" and "electronics" in label_refs:
-                elec = [i for i in products if i.get('category_id')]
-                label_refs["electronics"].config(text=str(len(elec)))
-            elif industry_id == "pharma" and "pharma" in label_refs:
-                expiring = len([i for i in products if i.get('expiry_date')])
-                label_refs["pharma"].config(text=str(expiring))
+
+            # Industry-specific KPIs
+            if industry_id == "electronics":
+                # Warranty exping
+                expiring_warranty = len([p for p in products if p.get('warranty_expiry')])
+                if "warranty" in label_refs:
+                    label_refs["warranty"].config(text=str(expiring_warranty))
+                    
+            elif industry_id == "pharma":
+                # Expired products
+                expired = len([p for p in products if p.get('expiry_date') and p.get('expiry_date') < datetime.now().strftime('%Y-%m-%d')])
+                if "expired" in label_refs:
+                    label_refs["expired"].config(text=str(expired), foreground=COLOR_DANGER)
+                
+                # Expiring soon (30 days)
+                from datetime import timedelta
+                thirty_days = (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d')
+                expiring = len([p for p in products if p.get('expiry_date') and p.get('expiry_date') < thirty_days and p.get('expiry_date') >= datetime.now().strftime('%Y-%m-%d')])
+                if "expiring" in label_refs:
+                    label_refs["expiring"].config(text=str(expiring), foreground=COLOR_WARNING)
+                    
         except Exception as e:
             logging.error(f"Failed to refresh dashboard stats: {e}")
+            # Set fallback values
+            for key, lbl in label_refs.items():
+                try:
+                    lbl.config(text="Error", foreground=COLOR_DANGER)
+                except Exception:
+                    logging.debug(f"Failed to update label {key}")
 
     # Register for real-time updates and fetch initial
     from app_core import app_state
     app_state.register_ui_callback("db_changed", refresh_dashboard_kpis)
+    
+    # Initial fetch
     refresh_dashboard_kpis()
+    
+    # Set up a secondary periodic refresh as backup (every 60 seconds)
+    # This ensures KPIs stay fresh even if db_changed notifications are missed
+    def periodic_refresh():
+        if dashboard_frame.winfo_exists():
+            refresh_dashboard_kpis()
+            dashboard_frame.after(60000, periodic_refresh)  # Refresh every 60 seconds
+    
+    periodic_refresh()
 
     # --- INDUSTRY SELECTOR ---
     if create_industry_selector_card:
@@ -185,21 +242,37 @@ def create_dashboard_tab(parent, username, role, switch_tab_callback=None):
         btn = make_button(quick_actions, text=text, command=cmd, kind="secondary" if i > 0 else "primary")
         btn.pack(side="left", padx=(0, 15))
 
-    # --- Footer Info ---
+    # --- System & Owner Information Card ---
     info_frame = make_card(dashboard_frame, padx=25, pady=20)
     info_frame.pack(fill='x', pady=(0, 20))
+
+    styled_label(info_frame, "📌 System Overview", font=SUBHEADING_FONT, foreground=COLOR_TEXT_MAIN).pack(anchor='w', pady=(0, 15))
+
+    # Two-column layout for info
+    info_cols = ttk.Frame(info_frame)
+    info_cols.pack(fill='x')
     
-    styled_label(info_frame, "📌 System Overview", font=SUBHEADING_FONT, foreground=COLOR_TEXT_MAIN).pack(anchor='w', pady=(0, 10))
+    left_col = ttk.Frame(info_cols)
+    left_col.pack(side="left", fill="x", expand=True)
     
-    overview_text = f"Business Type: {meta['name']} | Status: Active | Mode: {industry_id.upper()}"
-    styled_label(info_frame, overview_text, foreground=COLOR_TEXT_MUTED).pack(anchor='w')
-    
-    create_divider(info_frame, orientation="horizontal", color=COLOR_BORDER, thickness=1).pack(fill='x', pady=(15, 15))
+    right_col = ttk.Frame(info_cols)
+    right_col.pack(side="left", fill="x", expand=True)
 
     settings = load_settings()
+    company_name = settings.get("company_name", "Mintaka Sphere Inventory System")
     support_email = settings.get("support_email", "support@mintakasphere.com")
-    styled_label(info_frame, f"📧 Support: {support_email} | Version 1.0.0",
-                font=FONT_SMALL, foreground=COLOR_TEXT_MUTED).pack(anchor='w')
+    currency = settings.get("currency", "PKR")
+    tax_rate = settings.get("tax_rate", "0")
+
+    # Left column - System Info
+    styled_label(left_col, f"🏢 Company: {company_name}", font=FONT_SMALL, foreground=COLOR_TEXT_MAIN).pack(anchor='w', pady=2)
+    styled_label(left_col, f"📧 Support: {support_email}", font=FONT_SMALL, foreground=COLOR_TEXT_MUTED).pack(anchor='w', pady=2)
+    styled_label(left_col, f"💰 Currency: {currency} | Tax: {float(tax_rate):.1f}%", font=FONT_SMALL, foreground=COLOR_TEXT_MUTED).pack(anchor='w', pady=2)
+
+    # Right column - Industry & User Info
+    styled_label(right_col, f"🏭 Industry: {config.industry_name} {config.icon}", font=FONT_SMALL, foreground=COLOR_TEXT_MAIN).pack(anchor='w', pady=2)
+    styled_label(right_col, f"👤 User: {username.capitalize()} | Role: {role.upper()}", font=FONT_SMALL, foreground=COLOR_TEXT_MUTED).pack(anchor='w', pady=2)
+    styled_label(right_col, f"💾 Software: Mintaka Sphere IMS v1.0.0 | Status: Active", font=FONT_SMALL, foreground=COLOR_SUCCESS).pack(anchor='w', pady=2)
     
     # --- Administrative Panel (Admins Only) ---
     if role in ["admin", "OWNER_ADMIN"]:

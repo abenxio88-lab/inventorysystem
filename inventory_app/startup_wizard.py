@@ -249,7 +249,7 @@ def create_startup_wizard(parent, on_complete_callback=None):
         def select_type(type_id):
             type_var.set(type_id)
             state['company_type'] = type_id
-            print(f"DEBUG: Selected company type: {type_id}")
+            logging.debug(f"Selected company type: {type_id}")
         
         # Create cards
         for type_id, config in COMPANY_TYPES.items():
