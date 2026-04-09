@@ -26,6 +26,40 @@ def set_current_theme(theme_name):
     global _current_theme
     _current_theme = theme_name
 
+def get_palette():
+    """Get the current theme's color palette as a dictionary.
+    
+    Returns color constants for the current theme (light or dark).
+    """
+    is_dark = _current_theme == "dark"
+    
+    return {
+        # Background colors
+        "app_bg": COLOR_APP_BG_DARK if is_dark else COLOR_APP_BG_LIGHT,
+        "card_bg": COLOR_CARD_BG_DARK if is_dark else COLOR_CARD_BG_LIGHT,
+        "glass_bg": COLOR_GLASS_BG_DARK if is_dark else COLOR_GLASS_BG_LIGHT,
+        
+        # Primary colors
+        "primary": COLOR_PRIMARY_DARK if is_dark else COLOR_PRIMARY_LIGHT,
+        "primary_dark": COLOR_PRIMARY_DARKER if is_dark else COLOR_PRIMARY_DARK_LIGHT,
+        "primary_light": COLOR_PRIMARY_LIGHT_ACCENT,
+        "secondary": COLOR_SECONDARY_DARK if is_dark else COLOR_SECONDARY_LIGHT,
+        
+        # Status colors
+        "success": COLOR_SUCCESS_DARK if is_dark else COLOR_SUCCESS_LIGHT,
+        "danger": COLOR_DANGER_DARK if is_dark else COLOR_DANGER_LIGHT,
+        "warning": COLOR_WARNING_DARK if is_dark else COLOR_WARNING_LIGHT,
+        "info": COLOR_INFO_DARK if is_dark else COLOR_INFO_LIGHT,
+        
+        # Text colors
+        "text_main": COLOR_TEXT_MAIN_DARK if is_dark else COLOR_TEXT_MAIN_LIGHT,
+        "text_muted": COLOR_TEXT_MUTED_DARK if is_dark else COLOR_TEXT_MUTED_LIGHT,
+        
+        # Border & effects
+        "border": COLOR_BORDER_DARK if is_dark else COLOR_BORDER_LIGHT,
+        "shadow": COLOR_SHADOW_DARK if is_dark else COLOR_SHADOW_LIGHT,
+    }
+
 # ============================================
 # LIGHT MODE - Glassmorphism White & Blue
 # ============================================
