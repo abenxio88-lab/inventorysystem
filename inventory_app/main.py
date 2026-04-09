@@ -388,9 +388,8 @@ class MintakaSphereApp:
         def on_login_success(username, role, user_id, login_win=None):
             self._on_login_success(username, role, user_id)
 
-        # open_login is a tkinter-based dialog - needs conversion separately
-        # For now, this call expects the tkinter version
-        open_login(on_success=on_login_success, master=self.main_window)
+        # Show PySide6 login dialog
+        open_login(on_success=on_login_success, parent=self.main_window)
 
     def _on_login_success(self, username, role, user_id):
         """Handle successful login and build dashboard."""
