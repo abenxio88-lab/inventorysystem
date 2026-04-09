@@ -75,18 +75,18 @@ class SyncEngine:
                     if self._last_sync is None:
                         # First sync after going online
                         self._perform_sync()
-                    elif time.time() - self._last_sync_time >= self._sync_interval:
+                    elif time.time() - self._last_sync >= self._sync_interval:
                         # Periodic sync
                         self._perform_sync()
-                
+
                 # Sleep in small increments
                 for _ in range(60):  # Check every second
                     if not self._running:
                         break
                     time.sleep(1)
-                    
+
             except Exception as e:
-                logging.error(f"Sync loop error: {e}")
+                logging.error(f"Sync loop error: {e}", exc_info=True)
                 self._last_error = str(e)
     
     def _perform_sync(self):

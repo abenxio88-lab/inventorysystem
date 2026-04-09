@@ -1,0 +1,3 @@
+sqlite3 works
+connected
+found 1 users: [('ali123',)]

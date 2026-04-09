@@ -1,0 +1,8 @@
+Starting...
+Import OK
+DB industry: electronics
+Reload function set
+Tab reload called!
+After pharma: industry=pharma, db=pharma, result=True
+Tab reload called!
+After electronics: industry=electronics, db=electronics, result=True

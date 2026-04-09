@@ -20,97 +20,46 @@ from typing import Dict, Any, List, Optional, Callable
 logger = logging.getLogger(__name__)
 
 # ============================================================
-# CANONICAL INDUSTRY CONFIGURATION (Single Source of Truth)
+# INDUSTRY CONFIGURATION - Now uses the new config/ package
+# Backward compat: wraps new config in old dict format
 # ============================================================
 
-INDUSTRY_CONFIG: Dict[str, Dict[str, Any]] = {
-    "retail": {
-        "id": "retail",
-        "name": "General Retail",
-        "icon": "🛒",
-        "color": "#2563EB",
-        "description": "Standard retail inventory and POS",
-        "app_state_name": "Retail",
-        "features": {"track_expiry": False, "track_serial": False, "track_batch": False,
-                     "track_prescription": False, "track_repairs": False, "track_trade_in": False},
-        "custom_fields": [],
-        "default_categories": ["General", "Sale Items", "New Arrivals"],
-    },
-    "pharma": {
-        "id": "pharma",
-        "name": "Pharmacy",
-        "icon": "💊",
-        "color": "#10B981",
-        "description": "Medical supplies and batch tracking",
-        "app_state_name": "Pharma",
-        "features": {"track_expiry": True, "track_serial": False, "track_batch": True,
-                     "track_prescription": True, "track_repairs": False, "track_trade_in": False},
-        "custom_fields": [
-            ("generic_name", "Generic Name", "text"), ("manufacturer", "Manufacturer", "text"),
-            ("batch_number", "Batch Number", "text"), ("expiry_date", "Expiry Date", "date"),
-            ("dosage", "Dosage", "text"), ("form", "Form (Tablet/Syrup/etc)", "text"),
-            ("requires_prescription", "Requires Prescription", "boolean"),
-            ("storage_temp", "Storage Temperature", "text"),
-        ],
-        "default_categories": ["Prescription", "OTC", "Medical Supplies", "Vitamins", "First Aid"],
-    },
-    "electronics": {
-        "id": "electronics",
-        "name": "Electronics",
-        "icon": "📱",
-        "color": "#8B5CF6",
-        "description": "IMEI/Serial tracking and repairs",
-        "app_state_name": "Electronics",
-        "features": {"track_expiry": False, "track_serial": True, "track_batch": False,
-                     "track_prescription": False, "track_repairs": True, "track_trade_in": True},
-        "custom_fields": [
-            ("brand", "Brand", "text"), ("ram", "RAM", "text"), ("storage", "Storage", "text"),
-            ("screen_size", "Screen Size", "text"), ("camera", "Camera", "text"),
-            ("battery", "Battery", "text"), ("color", "Color", "text"),
-            ("warranty_months", "Warranty (Months)", "number"),
-        ],
-        "default_categories": ["Phones", "Tablets", "Laptops", "Accessories", "Audio"],
-    },
-    "lease_rental": {
-        "id": "lease_rental",
-        "name": "Lease & Rental",
-        "icon": "📋",
-        "color": "#F59E0B",
-        "description": "Equipment and property rental",
-        "app_state_name": "Lease & Rental",
-        "features": {"track_expiry": False, "track_serial": False, "track_batch": False,
-                     "track_prescription": False, "track_repairs": False, "track_trade_in": False},
-        "custom_fields": [],
-        "default_categories": ["Leases", "Contracts", "Properties", "Equipment"],
-    },
-    "manufacturing": {
-        "id": "manufacturing",
-        "name": "Manufacturing",
-        "icon": "🏭",
-        "color": "#F59E0B",
-        "description": "BOM and production tracking",
-        "app_state_name": "Manufacturing",
-        "features": {"track_expiry": False, "track_serial": False, "track_batch": True,
-                     "track_prescription": False, "track_repairs": False, "track_trade_in": False},
-        "custom_fields": [],
-        "default_categories": ["Raw Materials", "Work in Progress", "Finished Goods"],
-    },
-    "healthcare": {
-        "id": "healthcare",
-        "name": "Healthcare",
-        "icon": "🏥",
-        "color": "#EF4444",
-        "description": "Patient billing and medical records",
-        "app_state_name": "Healthcare",
-        "features": {"track_expiry": False, "track_serial": False, "track_batch": False,
-                     "track_prescription": True, "track_repairs": False, "track_trade_in": False},
-        "custom_fields": [],
-        "default_categories": ["Medical Supplies", "Equipment", "Pharmaceuticals", "Consumables"],
-    },
-}
+def _build_industry_config_dict():
+    """
+    Build INDUSTRY_CONFIG from the new config/ package.
+    Maintains backward compatibility with old callers.
+    """
+    from config import get_all_industries, get_industry_config
+    
+    result = {}
+    for industry_id in get_all_industries():
+        config = get_industry_config(industry_id)
+        result[industry_id] = {
+            "id": config.industry_id,
+            "name": config.industry_name,
+            "icon": config.icon,
+            "color": config.color,
+            "description": config.description,
+            "app_state_name": config.industry_name,
+            "features": {
+                "track_expiry": getattr(config, "expiry_monitoring", False),
+                "track_serial": getattr(config, "warranty_tracking", False),
+                "track_batch": getattr(config, "batch_tracking", False),
+                "track_prescription": industry_id == "pharma",
+                "track_repairs": False,
+                "track_trade_in": False,
+            },
+            "custom_fields": [],
+            "default_categories": [],
+        }
+    return result
 
-VALID_INDUSTRY_IDS = set(INDUSTRY_CONFIG.keys())
-DEFAULT_INDUSTRY_ID = "retail"
+INDUSTRY_CONFIG = _build_industry_config_dict()
+
+# Import from config/ package for direct use
+from config import get_all_industries, get_industry_config as _get_industry_config
+VALID_INDUSTRY_IDS = set(get_all_industries())
+DEFAULT_INDUSTRY_ID = "electronics"  # Changed from retail to electronics
 
 # Subscriber callbacks: fired when industry changes
 _subscribers: List[Callable[[str], None]] = []
@@ -204,9 +153,12 @@ def change_industry(industry_id: str) -> bool:
     Returns True on success, False on failure.
     """
     canonical_id = normalize_industry_id(industry_id)
+    
+    logger.info(f"🔄 Attempting industry switch: {industry_id} → {canonical_id}")
+    logger.info(f"   Valid industries: {VALID_INDUSTRY_IDS}")
 
     if canonical_id not in VALID_INDUSTRY_IDS:
-        logger.error(f"Invalid industry ID: '{industry_id}' (normalized to '{canonical_id}')")
+        logger.error(f"❌ Invalid industry ID: '{industry_id}' (normalized to '{canonical_id}')")
         return False
 
     # Step 1: Write to DB
@@ -214,10 +166,11 @@ def change_industry(industry_id: str) -> bool:
         from services import svc
         success = svc.db.set_industry_type(canonical_id)
         if not success:
-            logger.error(f"Failed to write industry '{canonical_id}' to DB")
+            logger.error(f"❌ Failed to write industry '{canonical_id}' to DB")
             return False
+        logger.info(f"   ✅ DB updated: industry_type = '{canonical_id}'")
     except Exception as e:
-        logger.error(f"DB error setting industry '{canonical_id}': {e}")
+        logger.error(f"❌ DB error setting industry '{canonical_id}': {e}")
         return False
 
     # Step 2: Update AppState
@@ -226,16 +179,21 @@ def change_industry(industry_id: str) -> bool:
         config = get_config(canonical_id)
         app_state_name = config.get("app_state_name", config["name"])
         app_state.industry_type = app_state_name
+        logger.info(f"   ✅ AppState updated: {app_state_name}")
     except Exception as e:
-        logger.error(f"Failed to update AppState: {e}")
+        logger.error(f"❌ Failed to update AppState: {e}")
         # Continue anyway — DB is the source of truth
 
     # Step 3: Trigger tab rebuild via registered callback (no import from main)
     if _tab_reload_fn:
         try:
-            _tab_reload_fn()
+            logger.info(f"   🔄 Triggering tab reload...")
+            result = _tab_reload_fn()
+            logger.info(f"   ✅ Tab reload result: {result}")
         except Exception as e:
-            logger.warning(f"Tab reload failed after industry change: {e}")
+            logger.warning(f"❌ Tab reload failed after industry change: {e}")
+    else:
+        logger.warning(f"⚠️ No tab reload function registered!")
 
     # Step 4: Notify subscribers
     _notify_subscribers(canonical_id)

@@ -103,14 +103,13 @@ def create_inventory_tab(parent, current_user="Unknown"):
         return svc.inventory.parse_related_id(field_name, raw_value)
 
     def _populate_tree(items=None):
-        """Fill the treeview with current inventory data."""
-        from migration_add_industry_type import get_industry_type
-        industry_mode = get_industry_type()
-
+        """Fill the treeview — dynamically matches tree columns from DB data."""
         tree.delete(*tree.get_children())
 
         if items is None:
             items = svc.inventory.get_all_products(active_only=True)
+
+        actual_columns = tree["columns"]
 
         for i, item in enumerate(items):
             stock_val = int(item.get("stock", 0))
@@ -118,22 +117,25 @@ def create_inventory_tab(parent, current_user="Unknown"):
             if stock_val <= 5:
                 tags = ("low",)
 
-            industry_info = ""
-            if industry_mode == "electronics":
-                industry_info = f"{item.get('ram', '-')}/{item.get('storage', '-')}"
-            elif industry_mode == "pharma":
-                expiry = item.get("expiry_date", "")
-                industry_info = f"Exp: {expiry[:10]}" if expiry else "No Expiry"
+            values = []
+            for col in actual_columns:
+                raw = item.get(col, "")
 
-            tree.insert("", "end", values=(
-                item.get("model", ""),
-                _resolve_category_display(item),
-                industry_info,
-                _resolve_supplier_display(item),
-                f'{item.get("purchase_price", 0):,}',
-                f'{item.get("selling_price", 0):,}',
-                stock_val,
-            ), tags=tags)
+                if col == "category_id":
+                    values.append(_resolve_category_display(item))
+                elif col == "supplier_id":
+                    values.append(_resolve_supplier_display(item))
+                elif col in ("purchase_price", "selling_price"):
+                    val = float(raw) if raw else 0
+                    values.append(f'{val:,}')
+                elif col == "stock":
+                    values.append(stock_val)
+                elif col == "expiry_date":
+                    values.append(str(raw)[:10] if raw else "-")
+                else:
+                    values.append(raw if raw else "-")
+
+            tree.insert("", "end", values=values, tags=tags)
 
     def _refresh_model_dropdown():
         """Update the model dropdown with current product models."""
@@ -399,23 +401,32 @@ def create_inventory_tab(parent, current_user="Unknown"):
     make_button(toolbar, "⛶", command=toggle_fullscreen, kind="secondary").pack(side="right")
 
     # ========================================================
-    #  TREE VIEW
+    #  TREE VIEW — columns built 100% from form field configs
     # ========================================================
     table_frame = make_card(right_frame, padx=10, pady=10)
     table_frame.pack(fill="both", expand=True)
 
-    columns = ("model", "category", "screen", "supplier", "purchase", "selling", "stock")
-    tree = ttk.Treeview(table_frame, columns=columns, show="headings")
+    from migration_add_industry_type import get_industry_type
+    from unified_data_entry import IndustryConfig
 
-    column_map = {
-        "model": ("Model Name", 150),
-        "category": ("Category", 80),
-        "screen": ("Screen Type", 80),
-        "supplier": ("Supplier", 100),
-        "purchase": ("Purchase Price", 100),
-        "selling": ("Selling Price", 100),
-        "stock": ("Stock Level", 60),
-    }
+    industry_mode = get_industry_type()
+    field_configs = IndustryConfig.get_fields(industry_mode, "products")
+
+    # Build label lookup
+    _labels = {}
+    for fc in field_configs:
+        _labels[fc["name"]] = fc["label"]
+
+    # Build column map directly from field configs — EXACT same fields as form
+    # Show ALL form fields in the tree
+    column_map = {}
+    for fc in field_configs:
+        name = fc["name"]
+        label_text = fc["label"]
+        column_map[name] = (label_text, 100)
+
+    columns = list(column_map.keys())
+    tree = ttk.Treeview(table_frame, columns=columns, show="headings")
 
     for col, (label_text, width) in column_map.items():
         tree.heading(col, text=label_text.upper(), anchor="center")
@@ -452,10 +463,10 @@ def create_inventory_tab(parent, current_user="Unknown"):
         item = svc.inventory.get_product_by_model(model_name)
         if not item:
             return
-        
+
         for field_name, widget in form.widgets.items():
             val = item.get(field_name, "")
-            
+
             try:
                 # For combobox widgets (category_id, supplier_id), show human text or fall back
                 if field_name == 'category_id':
@@ -476,7 +487,6 @@ def create_inventory_tab(parent, current_user="Unknown"):
     tree.bind("<<TreeviewSelect>>", on_select)
 
     try:
-        style = ttk.Style()
         style.configure("Treeview", font=FONT_REGULAR, rowheight=28)
         style.configure("Treeview.Heading", font=FONT_BOLD)
     except Exception:

@@ -521,6 +521,40 @@ These functions exist but have **no button, menu, or keyboard shortcut** to call
 
 ---
 
+## 🚀 RECENT SYSTEMATIC IMPROVEMENTS (April 8, 2026)
+
+### Critical Bug Fixes
+- ✅ **Fixed AttributeError in sync_engine.py**: Changed `self._last_sync_time` to `self._last_sync` (line 78) - This was causing the background sync thread to crash on every periodic sync attempt.
+- ✅ **Improved sync error logging**: Added `exc_info=True` to ensure full stack traces are visible in dev_dashboard and app.log.
+
+### Performance & UX Improvements
+- ✅ **Background backup in main.py**: Moved `backup_manager.create_backup()` to a background thread to prevent UI freezing during login transition.
+- ✅ **Robust stats ticker**: Refactored `update_stats()` with proper `_stats_running` flag, better error handling, and fallback UI ("Stats unavailable").
+
+### Database Architecture
+- ✅ **Modular database package**: Split database.py into domain-specific modules:
+  - `db/inventory.py` - Product, category, and pharmacy operations
+  - `db/orders.py` - Sales, purchase orders, invoices, returns, transfers
+  - `db/system.py` - Locations, suppliers, customers, users, settings, leases, serial numbers
+  - `db/__init__.py` - Composition layer with full backward compatibility
+- ✅ **Moved resolve_display methods**: `resolve_category_display()` and `resolve_supplier_display()` moved from services.py to InventoryDB to maintain "No SQL in Services" rule.
+- ✅ **Consistent return patterns**: All database methods now follow consistent Exception vs. Boolean return patterns.
+
+### Dashboard Enhancements
+- ✅ **Dynamic KPI refresh**: Implemented dual-refresh system:
+  - Real-time: via `app_state.register_ui_callback("db_changed", ...)`
+  - Periodic: 60-second fallback timer to ensure KPIs stay fresh
+- ✅ **Error handling**: Dashboard now shows "Error" state with COLOR_DANGER on refresh failures
+- ✅ **Responsive layout**: Renamed `stats_frame` to `stats_canvas_frame` for better responsiveness on smaller screens
+- ✅ **Fixed layout overlap**: Improved header and badge container packing to prevent content overlap
+
+### Verification
+- ✅ All changes maintain 100% backward compatibility via db/__init__.py re-exports
+- ✅ No breaking changes to existing UI or service layer imports
+- ✅ Sync engine loop now stable and production-ready
+
+---
+
 ## 🎯 QUICK REFERENCE: What Each File Does
 
 ### Entry Points
@@ -577,7 +611,12 @@ These functions exist but have **no button, menu, or keyboard shortcut** to call
 - **dev_dashboard.py** → Developer dashboard
 
 ### System & Utilities
-- **database.py** → All database access
+- **database.py** → Core database infrastructure, schema initialization, migrations, auth functions
+- **db/** → Modular database access layer (NEW):
+  - `db/inventory.py` → Product, category, pharmacy operations (InventoryDBMixin)
+  - `db/orders.py` → Sales, purchases, invoices, returns, transfers (OrdersDBMixin)
+  - `db/system.py` → Locations, suppliers, customers, users, settings (SystemDBMixin)
+  - `db/__init__.py` → Composition layer, re-exports all methods for backward compatibility
 - **services.py** → Business logic layer (svc singleton)
 - **security.py** → Password hashing, validation, rate limiting
 - **error_manager.py** → Error tracking and notification
