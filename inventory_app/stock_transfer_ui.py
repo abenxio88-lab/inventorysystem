@@ -4,8 +4,7 @@ Stock Transfer Module
 Transfer inventory between locations/warehouses.
 """
 
-import tkinter as tk
-from tkinter import ttk, messagebox
+from PySide6 import QtWidgets, QtCore, QtGui
 import logging
 from datetime import datetime
 
@@ -22,48 +21,52 @@ def create_stock_transfers_tab(parent, current_user=None):
     """
     Creates the stock transfers management tab.
     """
-    window = ttk.Frame(parent, padding=15)
+    window = QtWidgets.QWidget()
+    main_layout = QtWidgets.QVBoxLayout(window)
+    main_layout.setContentsMargins(15, 15, 15, 15)
+    main_layout.setSpacing(10)
 
     # Header
-    header_frame = ttk.Frame(window)
-    header_frame.pack(fill="x", pady=(0, 15))
-
-    styled_label(header_frame, "🔄 Stock Transfers", font=FONT_BOLD).pack(side=tk.LEFT)
+    header_frame = QtWidgets.QWidget()
+    header_layout = QtWidgets.QHBoxLayout(header_frame)
+    header_layout.setContentsMargins(0, 0, 0, 15)
+    styled_label(header_frame, "Stock Transfers", font=FONT_BOLD)
+    header_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft)
+    main_layout.addWidget(header_frame)
 
     # New Transfer button
     def open_new_transfer():
         open_transfer_dialog(window, current_user=current_user)
 
-    make_button(header_frame, "➕ New Transfer", command=open_new_transfer, kind="success").pack(side=tk.RIGHT)
+    new_btn = make_button(header_frame, "New Transfer", command=open_new_transfer, kind="success")
+    header_layout.addStretch()
+    header_layout.addWidget(new_btn)
 
     # Filter toolbar
-    toolbar_frame = ttk.Frame(window)
-    toolbar_frame.pack(fill="x", pady=(0, 10))
+    toolbar_frame = QtWidgets.QWidget()
+    toolbar_layout = QtWidgets.QHBoxLayout(toolbar_frame)
+    toolbar_layout.setContentsMargins(0, 0, 0, 10)
+    main_layout.addWidget(toolbar_frame)
 
-    styled_label(toolbar_frame, "Status:").pack(side=tk.LEFT, padx=(0, 10))
-
-    status_var = tk.StringVar(value="all")
-    status_combo = ttk.Combobox(
-        toolbar_frame,
-        textvariable=status_var,
-        values=["all", "pending", "in_transit", "completed", "cancelled"],
-        state="readonly",
-        width=15
-    )
-    status_combo.pack(side=tk.LEFT)
+    styled_label(toolbar_frame, "Status:")
+    status_combo = QtWidgets.QComboBox()
+    status_combo.addItems(["all", "pending", "in_transit", "completed", "cancelled"])
+    toolbar_layout.addWidget(status_combo)
 
     def apply_filter():
         refresh_from_db()
 
-    make_button(toolbar_frame, "Apply", command=apply_filter, kind="primary").pack(side=tk.LEFT, padx=10)
+    apply_btn = make_button(toolbar_frame, "Apply", command=apply_filter, kind="primary")
+    toolbar_layout.addWidget(apply_btn)
+    toolbar_layout.addStretch()
 
     # Transfers table
     table_frame = make_card(window, padding=10)
-    table_frame.pack(fill="both", expand=True)
+    table_layout = QtWidgets.QHBoxLayout(table_frame)
+    table_layout.setContentsMargins(0, 0, 0, 0)
+    main_layout.addWidget(table_frame)
 
     columns = ("transfer_number", "from_location", "to_location", "date", "status", "items", "created_by")
-    tree = ttk.Treeview(table_frame, columns=columns, show="headings")
-
     column_map = {
         "transfer_number": ("Transfer #", 120),
         "from_location": ("From", 150),
@@ -74,55 +77,72 @@ def create_stock_transfers_tab(parent, current_user=None):
         "created_by": ("Created By", 120)
     }
 
-    for col, (label_text, width) in column_map.items():
-        tree.heading(col, text=label_text, anchor="w")
-        tree.column(col, width=width, anchor="w", minwidth=80)
+    tree = QtWidgets.QTableWidget()
+    tree.setColumnCount(len(columns))
+    tree.setHorizontalHeaderLabels([column_map[c][0] for c in columns])
+    tree.horizontalHeader().setStretchLastSection(True)
+    tree.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Interactive)
+    tree.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+    tree.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
 
-    # Scrollbar
-    scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tree.yview)
-    tree.configure(yscrollcommand=scrollbar.set)
-    scrollbar.pack(side=tk.RIGHT, fill="y")
-    tree.pack(side=tk.LEFT, fill="both", expand=True)
+    for i, col in enumerate(columns):
+        tree.setColumnWidth(i, column_map[col][1])
+
+    table_layout.addWidget(tree)
 
     # Action buttons
-    action_frame = ttk.Frame(window)
-    action_frame.pack(fill="x", pady=(10, 0))
+    action_frame = QtWidgets.QWidget()
+    action_layout = QtWidgets.QHBoxLayout(action_frame)
+    action_layout.setContentsMargins(0, 10, 0, 0)
+    main_layout.addWidget(action_frame)
 
     def on_view_details():
-        sel = tree.selection()
-        if not sel:
-            messagebox.showinfo("Select", "Please select a transfer")
+        selected_rows = tree.selectionModel().selectedRows()
+        if not selected_rows:
+            QtWidgets.QMessageBox.information(window, "Select", "Please select a transfer")
             return
 
-        transfer_id = tree.item(sel[0], 'tags')[0] if tree.item(sel[0], 'tags') else None
+        row = selected_rows[0].row()
+        transfer_id_text = tree.item(row, 0).text() if tree.item(row, 0) else None
 
-        if transfer_id:
-            open_transfer_details(window, transfer_id=int(transfer_id))
+        if transfer_id_text:
+            open_transfer_details(window, transfer_number=transfer_id_text)
 
     def on_complete_transfer():
-        sel = tree.selection()
-        if not sel:
-            messagebox.showinfo("Select", "Please select a transfer")
+        selected_rows = tree.selectionModel().selectedRows()
+        if not selected_rows:
+            QtWidgets.QMessageBox.information(window, "Select", "Please select a transfer")
             return
 
-        transfer_id = tree.item(sel[0], 'tags')[0] if tree.item(sel[0], 'tags') else None
+        row = selected_rows[0].row()
+        transfer_id_text = tree.item(row, 0).text() if tree.item(row, 0) else None
 
-        if transfer_id and messagebox.askyesno("Confirm", "Mark this transfer as completed?"):
-            svc.stock_transfer.complete_transfer(int(transfer_id), username=current_user)
-            refresh_from_db()
+        if transfer_id_text:
+            reply = QtWidgets.QMessageBox.question(window, "Confirm", "Mark this transfer as completed?",
+                                                    QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No)
+            if reply == QtWidgets.QMessageBox.StandardButton.Yes:
+                # Find transfer to get ID
+                transfers = svc.stock_transfer.get_transfers()
+                tr = next((t for t in transfers if t['transfer_number'] == transfer_id_text), None)
+                if tr:
+                    svc.stock_transfer.complete_transfer(tr['id'], username=current_user)
+                    refresh_from_db()
 
-    make_button(action_frame, "👁️ View Details", command=on_view_details, kind="primary").pack(side=tk.LEFT, padx=5)
-    make_button(action_frame, "✅ Complete", command=on_complete_transfer, kind="success").pack(side=tk.LEFT, padx=5)
+    view_btn = make_button(action_frame, "View Details", command=on_view_details, kind="primary")
+    action_layout.addWidget(view_btn)
+    complete_btn = make_button(action_frame, "Complete", command=on_complete_transfer, kind="success")
+    action_layout.addWidget(complete_btn)
+    action_layout.addStretch()
 
     # Store state
-    window.status_var = status_var
+    window.status_combo = status_combo
     window.tree = tree
 
     def refresh_from_db():
         """Refresh all data from the database through services."""
-        tree.delete(*tree.get_children())
+        tree.setRowCount(0)
 
-        status_filter = status_var.get()
+        status_filter = status_combo.currentText()
         status_arg = None if status_filter == 'all' else status_filter
 
         transfers = svc.stock_transfer.get_transfers(status=status_arg)
@@ -134,19 +154,16 @@ def create_stock_transfers_tab(parent, current_user=None):
             'cancelled': COLOR_DANGER
         }
 
-        for transfer in transfers:
+        for row_idx, transfer in enumerate(transfers):
             status_text = transfer['status'].replace('_', ' ').title()
-            tags = (str(transfer['id']),)
-
-            tree.insert("", "end", values=(
-                transfer['transfer_number'],
-                transfer.get('from_location_name', ''),
-                transfer.get('to_location_name', ''),
-                transfer['transfer_date'][:16] if transfer['transfer_date'] else '',
-                status_text,
-                transfer.get('item_count', 0),
-                transfer.get('created_by_name', '') or 'System'
-            ), tags=tags)
+            tree.insertRow(row_idx)
+            tree.setItem(row_idx, 0, QtWidgets.QTableWidgetItem(transfer['transfer_number']))
+            tree.setItem(row_idx, 1, QtWidgets.QTableWidgetItem(transfer.get('from_location_name', '')))
+            tree.setItem(row_idx, 2, QtWidgets.QTableWidgetItem(transfer.get('to_location_name', '')))
+            tree.setItem(row_idx, 3, QtWidgets.QTableWidgetItem(transfer['transfer_date'][:16] if transfer['transfer_date'] else ''))
+            tree.setItem(row_idx, 4, QtWidgets.QTableWidgetItem(status_text))
+            tree.setItem(row_idx, 5, QtWidgets.QTableWidgetItem(str(transfer.get('item_count', 0))))
+            tree.setItem(row_idx, 6, QtWidgets.QTableWidgetItem(transfer.get('created_by_name', '') or 'System'))
 
     window.refresh_from_db = refresh_from_db
     window.refresh_transfers = refresh_from_db  # backward compatibility
@@ -157,96 +174,98 @@ def create_stock_transfers_tab(parent, current_user=None):
 
 def open_transfer_dialog(parent, current_user=None):
     """Open dialog to create a new stock transfer."""
-    dlg = tk.Toplevel(parent)
-    dlg.title("New Stock Transfer")
-    dlg.geometry("900x750")
-    dlg.resizable(True, True)
-    dlg.minsize(700, 600)
-    dlg.transient(parent)
-    dlg.grab_set()
+    dlg = QtWidgets.QDialog(parent)
+    dlg.setWindowTitle("New Stock Transfer")
+    dlg.resize(900, 750)
+    dlg.setModal(True)
 
-    # Content
-    content = ttk.Frame(dlg, padding=20)
-    content.pack(fill=tk.BOTH, expand=True)
+    main_layout = QtWidgets.QVBoxLayout(dlg)
+    main_layout.setContentsMargins(20, 20, 20, 20)
 
     # Heading
-    styled_label(content, "Create Stock Transfer", font=FONT_BOLD).pack(anchor=tk.W, pady=(0, 15))
+    styled_label(dlg, "Create Stock Transfer", font=FONT_BOLD)
 
     # From/To locations
-    loc_frame = ttk.Frame(content)
-    loc_frame.pack(fill=tk.X, pady=(0, 15))
-    loc_frame.grid_columnconfigure(1, weight=1)
+    loc_frame = QtWidgets.QWidget()
+    loc_layout = QtWidgets.QHBoxLayout(loc_frame)
+    loc_layout.setContentsMargins(0, 0, 0, 15)
+    main_layout.addWidget(loc_frame)
 
-    styled_label(loc_frame, "From Location *:", font=FONT_BOLD).grid(row=0, column=0, sticky=tk.W, padx=5)
-    from_var = tk.StringVar()
-    from_combo = ttk.Combobox(loc_frame, textvariable=from_var, state="readonly", width=30)
-    from_combo.grid(row=1, column=0, sticky=tk.EW, padx=5, pady=5)
+    from_combo = QtWidgets.QComboBox()
+    from_combo.setMinimumWidth(250)
+    loc_layout.addWidget(styled_label(loc_frame, "From Location *:", font=FONT_BOLD))
+    loc_layout.addWidget(from_combo)
 
-    styled_label(loc_frame, "To Location *:", font=FONT_BOLD).grid(row=0, column=1, sticky=tk.W, padx=5)
-    to_var = tk.StringVar()
-    to_combo = ttk.Combobox(loc_frame, textvariable=to_var, state="readonly", width=30)
-    to_combo.grid(row=1, column=1, sticky=tk.EW, padx=5, pady=5)
+    to_combo = QtWidgets.QComboBox()
+    to_combo.setMinimumWidth(250)
+    loc_layout.addWidget(styled_label(loc_frame, "To Location *:", font=FONT_BOLD))
+    loc_layout.addWidget(to_combo)
 
     # Load locations via service
     locations = svc.location.get_all_locations()
     loc_data = [(loc['id'], f"{loc['code']} - {loc['name']}") for loc in locations]
-    from_combo['values'] = [loc[1] for loc in loc_data]
-    to_combo['values'] = [loc[1] for loc in loc_data]
+    from_combo.addItems([loc[1] for loc in loc_data])
+    to_combo.addItems([loc[1] for loc in loc_data])
 
     # Products list
-    styled_label(content, "Products to Transfer:", font=FONT_BOLD).pack(anchor=tk.W, pady=(10, 5))
+    styled_label(dlg, "Products to Transfer:", font=FONT_BOLD)
 
-    products_frame = make_card(content, padding=10)
-    products_frame.pack(fill=tk.BOTH, expand=True)
+    products_frame = make_card(dlg, padding=10)
+    products_main_layout = QtWidgets.QVBoxLayout(products_frame)
+    main_layout.addWidget(products_frame)
 
     # Product selection
-    select_frame = ttk.Frame(products_frame)
-    select_frame.pack(fill=tk.X, pady=(0, 10))
+    select_frame = QtWidgets.QWidget()
+    select_layout = QtWidgets.QHBoxLayout(select_frame)
+    select_layout.setContentsMargins(0, 0, 0, 10)
+    products_main_layout.addWidget(select_frame)
 
-    styled_label(select_frame, "Product:").pack(side=tk.LEFT, padx=5)
-
-    product_var = tk.StringVar()
-    product_combo = ttk.Combobox(select_frame, textvariable=product_var, state="readonly", width=40)
-    product_combo.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+    product_combo = QtWidgets.QComboBox()
+    product_combo.setMinimumWidth(250)
+    select_layout.addWidget(styled_label(select_frame, "Product:"), stretch=0)
+    select_layout.addWidget(product_combo, stretch=1)
 
     # Load products with stock via service
     products = svc.stock_transfer.get_products_with_stock()
 
     product_data = [(p['id'], f"{p['model']} (Stock: {p['stock']})") for p in products]
-    product_combo['values'] = [p[1] for p in product_data]
+    product_combo.addItems([p[1] for p in product_data])
 
-    styled_label(select_frame, "Qty:").pack(side=tk.LEFT, padx=(15, 5))
-
-    qty_var = tk.StringVar(value="1")
-    qty_entry = ttk.Entry(select_frame, textvariable=qty_var, width=8)
-    qty_entry.pack(side=tk.LEFT, padx=5)
+    qty_edit = QtWidgets.QLineEdit("1")
+    qty_edit.setFixedWidth(60)
+    select_layout.addWidget(styled_label(select_frame, "Qty:"))
+    select_layout.addWidget(qty_edit)
 
     # Items list
-    styled_label(content, "Transfer Items:", font=FONT_BOLD).pack(anchor=tk.W, pady=(10, 5))
+    styled_label(dlg, "Transfer Items:", font=FONT_BOLD)
 
-    items_frame = ttk.Frame(products_frame)
-    items_frame.pack(fill=tk.BOTH, expand=True)
+    items_frame = QtWidgets.QWidget()
+    items_layout = QtWidgets.QVBoxLayout(items_frame)
+    items_layout.setContentsMargins(0, 0, 0, 0)
+    products_main_layout.addWidget(items_frame)
 
     columns = ("product", "quantity", "actions")
-    items_tree = ttk.Treeview(items_frame, columns=columns, show="headings", height=8)
-    items_tree.heading("product", text="Product")
-    items_tree.heading("quantity", text="Quantity")
-    items_tree.heading("actions", text="Actions")
-    items_tree.column("product", width=300)
-    items_tree.column("quantity", width=100, anchor="center")
-    items_tree.column("actions", width=100, anchor="center")
-
-    items_tree.pack(fill=tk.BOTH, expand=True)
+    items_tree = QtWidgets.QTableWidget()
+    items_tree.setColumnCount(len(columns))
+    items_tree.setHorizontalHeaderLabels(["Product", "Quantity", "Actions"])
+    items_tree.horizontalHeader().setStretchLastSection(True)
+    items_tree.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Interactive)
+    items_tree.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+    items_tree.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+    items_tree.setColumnWidth(0, 300)
+    items_tree.setColumnWidth(1, 100)
+    items_tree.setColumnWidth(2, 100)
+    items_layout.addWidget(items_tree)
 
     # Transfer items storage
     transfer_items = []
 
     def add_item():
-        product_sel = product_var.get()
-        qty = qty_var.get()
+        product_sel = product_combo.currentText()
+        qty = qty_edit.text()
 
         if not product_sel:
-            messagebox.showerror("Error", "Please select a product")
+            QtWidgets.QMessageBox.critical(dlg, "Error", "Please select a product")
             return
 
         try:
@@ -254,7 +273,7 @@ def open_transfer_dialog(parent, current_user=None):
             if qty_int <= 0:
                 raise ValueError("must be positive")
         except ValueError as e:
-            messagebox.showerror("Error", f"Invalid quantity: {e}")
+            QtWidgets.QMessageBox.critical(dlg, "Error", f"Invalid quantity: {e}")
             return
 
         # Find product ID
@@ -277,56 +296,56 @@ def open_transfer_dialog(parent, current_user=None):
         })
 
         # Update tree
-        items_tree.insert("", "end", values=(
-            product_name,
-            qty_int,
-            "🗑️ Remove"
-        ))
+        row = items_tree.rowCount()
+        items_tree.insertRow(row)
+        items_tree.setItem(row, 0, QtWidgets.QTableWidgetItem(product_name))
+        items_tree.setItem(row, 1, QtWidgets.QTableWidgetItem(str(qty_int)))
+        items_tree.setItem(row, 2, QtWidgets.QTableWidgetItem("Remove"))
 
         # Clear selection
-        product_var.set("")
-        qty_var.set("1")
+        product_combo.setCurrentIndex(-1)
+        qty_edit.setText("1")
 
-    def on_item_click(event):
-        sel = items_tree.selection()
-        if not sel:
-            return
+    def on_item_click(index):
+        row = index.row()
+        col = index.column()
+        if col == 2:
+            if 0 <= row < len(transfer_items):
+                transfer_items.pop(row)
+                items_tree.removeRow(row)
 
-        item = items_tree.item(sel[0])
-        if item['values'][2] == "🗑️ Remove":
-            index = items_tree.index(sel[0])
-            if 0 <= index < len(transfer_items):
-                transfer_items.pop(index)
-                items_tree.delete(sel[0])
-
-    items_tree.bind("<Button-1>", on_item_click)
+    items_tree.clicked.connect(on_item_click)
 
     # Add button
-    make_button(select_frame, "➕ Add", command=add_item, kind="primary").pack(side=tk.LEFT, padx=10)
+    add_btn = make_button(select_frame, "Add", command=add_item, kind="primary")
+    select_layout.addWidget(add_btn)
 
     # Notes
-    styled_label(content, "Notes:", font=FONT_BOLD).pack(anchor=tk.W, pady=(10, 5))
-    notes_text = tk.Text(content, height=3)
-    notes_text.pack(fill=tk.X, pady=(0, 10))
+    styled_label(dlg, "Notes:", font=FONT_BOLD)
+    notes_edit = QtWidgets.QTextEdit()
+    notes_edit.setMaximumHeight(80)
+    main_layout.addWidget(notes_edit)
 
     # Buttons
-    btn_frame = ttk.Frame(content)
-    btn_frame.pack(fill=tk.X, pady=(10, 0))
+    btn_frame = QtWidgets.QWidget()
+    btn_layout = QtWidgets.QHBoxLayout(btn_frame)
+    btn_layout.setContentsMargins(0, 10, 0, 0)
+    main_layout.addWidget(btn_frame)
 
     def save_transfer():
-        from_loc = from_var.get()
-        to_loc = to_var.get()
+        from_loc = from_combo.currentText()
+        to_loc = to_combo.currentText()
 
         if not from_loc or not to_loc:
-            messagebox.showerror("Error", "Please select both locations")
+            QtWidgets.QMessageBox.critical(dlg, "Error", "Please select both locations")
             return
 
         if from_loc == to_loc:
-            messagebox.showerror("Error", "From and To locations must be different")
+            QtWidgets.QMessageBox.critical(dlg, "Error", "From and To locations must be different")
             return
 
         if not transfer_items:
-            messagebox.showerror("Error", "Please add at least one product")
+            QtWidgets.QMessageBox.critical(dlg, "Error", "Please add at least one product")
             return
 
         # Get location IDs
@@ -347,7 +366,7 @@ def open_transfer_dialog(parent, current_user=None):
                 'from_location_id': from_id,
                 'to_location_id': to_id,
                 'status': 'pending',
-                'notes': notes_text.get("1.0", tk.END).strip(),
+                'notes': notes_edit.toPlainText().strip(),
                 'created_by': current_user
             }
 
@@ -362,8 +381,8 @@ def open_transfer_dialog(parent, current_user=None):
 
             svc.stock_transfer.create_transfer(transfer_data, items, username=current_user)
 
-            messagebox.showinfo("Success", f"Transfer created: {transfer_number}")
-            dlg.destroy()
+            QtWidgets.QMessageBox.information(dlg, "Success", f"Transfer created: {transfer_number}")
+            dlg.accept()
 
             # Refresh parent
             if hasattr(parent, 'refresh_from_db'):
@@ -371,41 +390,44 @@ def open_transfer_dialog(parent, current_user=None):
 
         except Exception as e:
             logging.exception("Failed to create transfer")
-            messagebox.showerror("Error", f"Failed to create transfer: {e}")
+            QtWidgets.QMessageBox.critical(dlg, "Error", f"Failed to create transfer: {e}")
 
-    make_button(btn_frame, "💾 Create Transfer", command=save_transfer, kind="success").pack(side=tk.LEFT, padx=5)
-    make_button(btn_frame, "Cancel", command=dlg.destroy, kind="secondary").pack(side=tk.LEFT, padx=5)
+    create_btn = make_button(btn_frame, "Create Transfer", command=save_transfer, kind="success")
+    btn_layout.addWidget(create_btn)
+    cancel_btn = make_button(btn_frame, "Cancel", command=dlg.reject, kind="secondary")
+    btn_layout.addWidget(cancel_btn)
+    btn_layout.addStretch()
 
 
-def open_transfer_details(parent, transfer_id):
+def open_transfer_details(parent, transfer_number):
     """View transfer details."""
-    dlg = tk.Toplevel(parent)
-    dlg.title("Transfer Details")
-    dlg.geometry("800x700")
-    dlg.resizable(True, True)
-    dlg.minsize(650, 550)
-    dlg.transient(parent)
-    dlg.grab_set()
+    dlg = QtWidgets.QDialog(parent)
+    dlg.setWindowTitle("Transfer Details")
+    dlg.resize(800, 700)
+    dlg.setModal(True)
 
-    content = ttk.Frame(dlg, padding=20)
-    content.pack(fill=tk.BOTH, expand=True)
+    main_layout = QtWidgets.QVBoxLayout(dlg)
+    main_layout.setContentsMargins(20, 20, 20, 20)
 
     # Get transfer info via service
     transfers = svc.stock_transfer.get_transfers()
-    transfer = next((t for t in transfers if t['id'] == transfer_id), None)
+    transfer = next((t for t in transfers if t['transfer_number'] == transfer_number), None)
 
     if not transfer:
-        styled_label(content, "Transfer not found", foreground=COLOR_DANGER, font=FONT_BOLD).pack(anchor=tk.W)
-        ttk.Button(dlg, text="Close", command=dlg.destroy).pack(pady=10)
+        styled_label(dlg, "Transfer not found", foreground=COLOR_DANGER, font=FONT_BOLD)
+        close_btn = QtWidgets.QPushButton("Close", dlg)
+        close_btn.clicked.connect(dlg.reject)
+        main_layout.addWidget(close_btn)
         return
 
     # Header
-    styled_label(content, f"Transfer: {transfer['transfer_number']}", font=FONT_BOLD).pack(anchor=tk.W)
-    styled_label(content, f"Status: {transfer['status'].title()}", foreground=COLOR_PRIMARY).pack(anchor=tk.W, pady=(5, 15))
+    styled_label(dlg, f"Transfer: {transfer['transfer_number']}", font=FONT_BOLD)
+    styled_label(dlg, f"Status: {transfer['status'].title()}", foreground=COLOR_PRIMARY)
 
     # Info
-    info_frame = make_card(content, padding=15)
-    info_frame.pack(fill=tk.X)
+    info_frame = make_card(dlg, padding=15)
+    info_layout = QtWidgets.QFormLayout(info_frame)
+    main_layout.addWidget(info_frame)
 
     info = [
         ("From:", transfer.get('from_location_name', 'N/A')),
@@ -415,34 +437,36 @@ def open_transfer_details(parent, transfer_id):
         ("Notes:", transfer.get('notes', '') or 'None')
     ]
 
-    for label, value in info:
-        frame = ttk.Frame(info_frame)
-        frame.pack(fill=tk.X, pady=3)
-        styled_label(frame, f"{label}", font=("Segoe UI", 10, "bold"), width=12).pack(side=tk.LEFT)
-        styled_label(frame, f"{value}").pack(side=tk.LEFT)
+    for lbl, val in info:
+        info_layout.addRow(label(info_frame, lbl, kind="bold"), label(info_frame, val))
 
     # Items
-    styled_label(content, "Transfer Items:", font=FONT_BOLD).pack(anchor=tk.W, pady=(15, 5))
+    styled_label(dlg, "Transfer Items:", font=FONT_BOLD)
 
-    items_frame = make_card(content, padding=10)
-    items_frame.pack(fill=tk.BOTH, expand=True)
+    items_frame = make_card(dlg, padding=10)
+    items_layout = QtWidgets.QVBoxLayout(items_frame)
+    main_layout.addWidget(items_frame)
 
     columns = ("product", "quantity", "received")
-    items_tree = ttk.Treeview(items_frame, columns=columns, show="headings")
+    items_tree = QtWidgets.QTableWidget()
+    items_tree.setColumnCount(len(columns))
+    items_tree.setHorizontalHeaderLabels([col.title() for col in columns])
+    items_tree.horizontalHeader().setStretchLastSection(True)
+    items_tree.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Interactive)
+    items_tree.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+    items_tree.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+    for i in range(3):
+        items_tree.setColumnWidth(i, 150)
+    items_layout.addWidget(items_tree)
 
-    for col in columns:
-        items_tree.heading(col, text=col.title())
-        items_tree.column(col, width=150)
-
-    items_tree.pack(fill=tk.BOTH, expand=True)
-
-    items = svc.stock_transfer.get_transfer_items(transfer_id)
-    for row in items:
-        items_tree.insert("", "end", values=(
-            row.get('product_name', ''),
-            row['quantity'],
-            row.get('received_quantity', 0) or 0
-        ))
+    items = svc.stock_transfer.get_transfer_items(transfer['id'])
+    for row_idx, row in enumerate(items):
+        items_tree.insertRow(row_idx)
+        items_tree.setItem(row_idx, 0, QtWidgets.QTableWidgetItem(row.get('product_name', '')))
+        items_tree.setItem(row_idx, 1, QtWidgets.QTableWidgetItem(str(row['quantity'])))
+        items_tree.setItem(row_idx, 2, QtWidgets.QTableWidgetItem(str(row.get('received_quantity', 0) or 0)))
 
     # Close button
-    ttk.Button(dlg, text="Close", command=dlg.destroy).pack(pady=10)
+    close_btn = QtWidgets.QPushButton("Close", dlg)
+    close_btn.clicked.connect(dlg.reject)
+    main_layout.addWidget(close_btn)

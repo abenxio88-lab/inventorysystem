@@ -1,11 +1,11 @@
 """
 Premium Dashboard UI with Interactive Charts, AI Insights, and Glassmorphism
 """
-import tkinter as tk
-from tkinter import ttk, simpledialog, messagebox
 import os
 from datetime import datetime, timedelta
 import logging
+
+from PySide6 import QtWidgets, QtCore, QtGui
 
 # Project imports
 from services import svc
@@ -28,12 +28,17 @@ from utils import load_settings, save_settings, get_data_dir, load_json_file
 def create_dashboard_tab(parent, username, role, switch_tab_callback=None):
     """
     Creates the premium dashboard tab with glassmorphism cards and industry-specific context.
+    Returns a QtWidgets.QWidget.
     """
-    dashboard_frame = ttk.Frame(parent, padding=30)
+    dashboard_widget = QtWidgets.QWidget()
+    dashboard_widget.setObjectName("dashboard_tab")
+    main_layout = QtWidgets.QVBoxLayout(dashboard_widget)
+    main_layout.setContentsMargins(30, 30, 30, 30)
+    main_layout.setSpacing(20)
 
     # --- Header Information ---
     from config import get_industry_config, get_default_industry
-    
+
     # Get industry config (from DB or default)
     try:
         from database import db
@@ -41,93 +46,101 @@ def create_dashboard_tab(parent, username, role, switch_tab_callback=None):
     except Exception:
         logging.warning("Failed to get industry from DB, using default")
         industry_id = get_default_industry()
-    
+
     config = get_industry_config(industry_id)
 
     # --- Premium Header ---
-    header_frame = ttk.Frame(dashboard_frame)
-    header_frame.pack(fill='x', pady=(0, 30))
+    header_layout = QtWidgets.QHBoxLayout()
+    header_layout.setSpacing(20)
 
     # Left side: Welcome & Role
-    user_info_frame = ttk.Frame(header_frame)
-    user_info_frame.pack(side="left", fill="x", expand=True)
+    user_info_widget = QtWidgets.QWidget()
+    user_info_layout = QtWidgets.QVBoxLayout(user_info_widget)
+    user_info_layout.setContentsMargins(0, 0, 0, 0)
+    user_info_layout.setSpacing(5)
 
-    welcome_label = styled_label(user_info_frame, f"Welcome back, {username.capitalize()}", font=FONT_HEADING, foreground=COLOR_PRIMARY)
-    welcome_label.pack(anchor="w")
+    welcome_label = styled_label(user_info_widget, f"Welcome back, {username.capitalize()}", font=FONT_HEADING, foreground=COLOR_PRIMARY)
+    user_info_layout.addWidget(welcome_label)
 
-    role_info_frame = ttk.Frame(user_info_frame)
-    role_info_frame.pack(anchor="w", pady=(5, 0))
+    role_label = styled_label(user_info_widget, f"Role: {role.upper()}", font=FONT_SMALL, foreground=COLOR_TEXT_MUTED)
+    user_info_layout.addWidget(role_label)
+    user_info_layout.addStretch()
 
-    styled_label(role_info_frame, f"Role: {role.upper()}", font=FONT_SMALL, foreground=COLOR_TEXT_MUTED).pack(side="left")
+    header_layout.addWidget(user_info_widget, stretch=1)
 
     # Right side: Current Industry Badge (from config)
-    badge_container = ttk.Frame(header_frame)
-    badge_container.pack(side="right", anchor="n", padx=(10, 0))
-
     industry_badge = create_status_badge(
-        badge_container,
+        dashboard_widget,
         text=config.industry_name.upper(),
         icon=config.icon,
         color=config.color
     )
-    industry_badge.pack()
+    header_layout.addWidget(industry_badge, alignment=QtCore.Qt.AlignTop)
 
-    create_divider(dashboard_frame, orientation="horizontal", color=COLOR_BORDER, thickness=1).pack(fill='x', pady=(0, 30))
+    main_layout.addLayout(header_layout)
+
+    # Divider
+    divider = create_divider(dashboard_widget, orientation="horizontal", color=COLOR_BORDER, thickness=1)
+    main_layout.addWidget(divider)
 
     # --- PREMIUM STATS CARDS (config-driven) ---
-    stats_canvas_frame = ttk.Frame(dashboard_frame)
-    stats_canvas_frame.pack(fill='x', pady=(0, 40))
+    stats_layout = QtWidgets.QHBoxLayout()
+    stats_layout.setSpacing(15)
 
     label_refs = {}
+    card_widgets = []
 
     # Build KPI cards from industry config
     # Each industry can define its own KPI structure
     if industry_id == "electronics":
         # Electronics KPIs
         card_configs = [
-            {"id": "products", "title": "📦 Products", "value": "...", "color": COLOR_PRIMARY, "icon": "📦", "tab": "Inventory"},
-            {"id": "stock", "title": "📊 Total Stock", "value": "...", "color": COLOR_INFO, "icon": "📊", "tab": "Inventory"},
-            {"id": "warranty", "title": "⚠️ Expiring Warranty", "value": "...", "color": COLOR_DANGER, "icon": "🔧", "tab": "Warranty"},
-            {"id": "sales", "title": "💰 Sales", "value": "...", "color": "#10B981", "icon": "💸", "tab": "Sales"},
+            {"id": "products", "title": "Products", "value": "...", "color": COLOR_PRIMARY, "icon": "\U0001F4E6", "tab": "Inventory"},
+            {"id": "stock", "title": "Total Stock", "value": "...", "color": COLOR_INFO, "icon": "\U0001F4CA", "tab": "Inventory"},
+            {"id": "warranty", "title": "Expiring Warranty", "value": "...", "color": COLOR_DANGER, "icon": "\U0001F527", "tab": "Warranty"},
+            {"id": "sales", "title": "Sales", "value": "...", "color": "#10B981", "icon": "\U0001F4B8", "tab": "Sales"},
         ]
     elif industry_id == "pharma":
         # Pharma KPIs
         card_configs = [
-            {"id": "products", "title": "📦 Products", "value": "...", "color": COLOR_PRIMARY, "icon": "📦", "tab": "Inventory"},
-            {"id": "expired", "title": "❌ Expired", "value": "...", "color": COLOR_DANGER, "icon": "💀", "tab": "Expiry Alerts"},
-            {"id": "expiring", "title": "⚠️ Expiring Soon", "value": "...", "color": COLOR_WARNING, "icon": "⏰", "tab": "Expiry Alerts"},
-            {"id": "sales", "title": "💰 Sales", "value": "...", "color": "#10B981", "icon": "💸", "tab": "Sales"},
+            {"id": "products", "title": "Products", "value": "...", "color": COLOR_PRIMARY, "icon": "\U0001F4E6", "tab": "Inventory"},
+            {"id": "expired", "title": "Expired", "value": "...", "color": COLOR_DANGER, "icon": "\U0001F480", "tab": "Expiry Alerts"},
+            {"id": "expiring", "title": "Expiring Soon", "value": "...", "color": COLOR_WARNING, "icon": "\u23F0", "tab": "Expiry Alerts"},
+            {"id": "sales", "title": "Sales", "value": "...", "color": "#10B981", "icon": "\U0001F4B8", "tab": "Sales"},
         ]
     else:
         # Retail/Default KPIs
         card_configs = [
-            {"id": "products", "title": "📦 Products", "value": "...", "color": COLOR_PRIMARY, "icon": "📦", "tab": "Inventory"},
-            {"id": "stock", "title": "📊 Total Stock", "value": "...", "color": COLOR_INFO, "icon": "📊", "tab": "Inventory"},
-            {"id": "low_stock", "title": "⚠️ Low Stock", "value": "...", "color": COLOR_SUCCESS, "icon": "⚠️", "tab": "Inventory"},
-            {"id": "sales", "title": "💰 Sales", "value": "...", "color": "#10B981", "icon": "💸", "tab": "Sales"},
+            {"id": "products", "title": "Products", "value": "...", "color": COLOR_PRIMARY, "icon": "\U0001F4E6", "tab": "Inventory"},
+            {"id": "stock", "title": "Total Stock", "value": "...", "color": COLOR_INFO, "icon": "\U0001F4CA", "tab": "Inventory"},
+            {"id": "low_stock", "title": "Low Stock", "value": "...", "color": COLOR_SUCCESS, "icon": "\u26A0\uFE0F", "tab": "Inventory"},
+            {"id": "sales", "title": "Sales", "value": "...", "color": "#10B981", "icon": "\U0001F4B8", "tab": "Sales"},
         ]
 
     # Create stats cards with responsive layout
-    for idx, config in enumerate(card_configs):
-        card_container = ttk.Frame(stats_canvas_frame)
-        card_container.pack(side="left", expand=True, fill="both", padx=(0, 15))
+    for idx, card_config in enumerate(card_configs):
+        card = make_card(dashboard_widget, padx=25, pady=25)
+        card_layout = QtWidgets.QVBoxLayout(card)
+        card_layout.setSpacing(10)
 
-        card = make_card(card_container, padx=25, pady=25)
-        card.pack(fill="both", expand=True)
+        icon_label = styled_label(card, card_config["icon"], font=("Segoe UI", 32))
+        icon_label.setAlignment(QtCore.Qt.AlignCenter)
+        card_layout.addWidget(icon_label)
 
-        icon_label = styled_label(card, config["icon"], font=("Segoe UI", 32))
-        icon_label.pack(pady=(0, 10))
+        title_label = styled_label(card, card_config["title"], font=FONT_SMALL, foreground=COLOR_TEXT_MUTED)
+        title_label.setAlignment(QtCore.Qt.AlignCenter)
+        card_layout.addWidget(title_label)
 
-        styled_label(card, config["title"].split(" ", 1)[-1], font=FONT_SMALL, foreground=COLOR_TEXT_MUTED).pack()
+        value_label = styled_label(card, card_config["value"], font=FONT_HEADING, foreground=card_config["color"])
+        value_label.setAlignment(QtCore.Qt.AlignCenter)
+        card_layout.addWidget(value_label)
 
-        value_label = styled_label(card, config["value"], font=FONT_HEADING, foreground=config["color"])
-        value_label.pack(pady=(5, 0))
-        label_refs[config["id"]] = value_label
+        label_refs[card_config["id"]] = value_label
+        card_widgets.append((card, card_config.get("tab")))
 
-        if switch_tab_callback:
-            def make_nav(target): return lambda e: switch_tab_callback(target)
-            card.bind("<Button-1>", make_nav(config["tab"]))
-            for w in card.winfo_children(): w.bind("<Button-1>", make_nav(config["tab"]))
+        stats_layout.addWidget(card, stretch=1)
+
+    main_layout.addLayout(stats_layout)
 
     def refresh_dashboard_kpis(*args):
         """Dynamic KPI refresh - reads from industry-specific service."""
@@ -139,62 +152,95 @@ def create_dashboard_tab(parent, username, role, switch_tab_callback=None):
             total_sales = len(orders)
 
             # Update base KPIs (all industries)
-            if "products" in label_refs: label_refs["products"].config(text=str(len(products)))
-            if "stock" in label_refs: label_refs["stock"].config(text=str(total_items))
+            if "products" in label_refs:
+                label_refs["products"].setText(str(len(products)))
+            if "stock" in label_refs:
+                label_refs["stock"].setText(str(total_items))
             if "low_stock" in label_refs:
-                label_refs["low_stock"].config(text=str(low_stock), foreground=COLOR_DANGER if low_stock > 0 else COLOR_SUCCESS)
-            if "sales" in label_refs: label_refs["sales"].config(text=str(total_sales))
+                lbl = label_refs["low_stock"]
+                lbl.setText(str(low_stock))
+                lbl.setStyleSheet(lbl.styleSheet().replace(
+                    f"color: {COLOR_SUCCESS};", f"color: {COLOR_DANGER};"
+                ) if low_stock > 0 else lbl.styleSheet().replace(
+                    f"color: {COLOR_DANGER};", f"color: {COLOR_SUCCESS};"
+                ))
+                lbl.setProperty("foreground", COLOR_DANGER if low_stock > 0 else COLOR_SUCCESS)
+                lbl.style().unpolish(lbl)
+                lbl.style().polish(lbl)
+            if "sales" in label_refs:
+                label_refs["sales"].setText(str(total_sales))
 
             # Industry-specific KPIs
             if industry_id == "electronics":
-                # Warranty exping
+                # Warranty expiring
                 expiring_warranty = len([p for p in products if p.get('warranty_expiry')])
                 if "warranty" in label_refs:
-                    label_refs["warranty"].config(text=str(expiring_warranty))
-                    
+                    label_refs["warranty"].setText(str(expiring_warranty))
+
             elif industry_id == "pharma":
                 # Expired products
                 expired = len([p for p in products if p.get('expiry_date') and p.get('expiry_date') < datetime.now().strftime('%Y-%m-%d')])
                 if "expired" in label_refs:
-                    label_refs["expired"].config(text=str(expired), foreground=COLOR_DANGER)
-                
+                    label_refs["expired"].setText(str(expired))
+                    label_refs["expired"].setStyleSheet(label_refs["expired"].styleSheet().replace(
+                        f"color: {COLOR_DANGER};", f"color: {COLOR_DANGER};"
+                    ))
+                    label_refs["expired"].setProperty("foreground", COLOR_DANGER)
+                    label_refs["expired"].style().unpolish(label_refs["expired"])
+                    label_refs["expired"].style().polish(label_refs["expired"])
+
                 # Expiring soon (30 days)
-                from datetime import timedelta
                 thirty_days = (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d')
                 expiring = len([p for p in products if p.get('expiry_date') and p.get('expiry_date') < thirty_days and p.get('expiry_date') >= datetime.now().strftime('%Y-%m-%d')])
                 if "expiring" in label_refs:
-                    label_refs["expiring"].config(text=str(expiring), foreground=COLOR_WARNING)
-                    
+                    label_refs["expiring"].setText(str(expiring))
+                    label_refs["expiring"].setStyleSheet(label_refs["expiring"].styleSheet().replace(
+                        f"color: {COLOR_WARNING};", f"color: {COLOR_WARNING};"
+                    ))
+                    label_refs["expiring"].setProperty("foreground", COLOR_WARNING)
+                    label_refs["expiring"].style().unpolish(label_refs["expiring"])
+                    label_refs["expiring"].style().polish(label_refs["expiring"])
+
         except Exception as e:
             logging.error(f"Failed to refresh dashboard stats: {e}")
             # Set fallback values
             for key, lbl in label_refs.items():
                 try:
-                    lbl.config(text="Error", foreground=COLOR_DANGER)
+                    lbl.setText("Error")
+                    lbl.setProperty("foreground", COLOR_DANGER)
+                    lbl.style().unpolish(lbl)
+                    lbl.style().polish(lbl)
                 except Exception:
                     logging.debug(f"Failed to update label {key}")
 
     # Register for real-time updates and fetch initial
     from app_core import app_state
     app_state.register_ui_callback("db_changed", refresh_dashboard_kpis)
-    
+
     # Initial fetch
     refresh_dashboard_kpis()
-    
+
     # Set up a secondary periodic refresh as backup (every 60 seconds)
     # This ensures KPIs stay fresh even if db_changed notifications are missed
-    def periodic_refresh():
-        if dashboard_frame.winfo_exists():
-            refresh_dashboard_kpis()
-            dashboard_frame.after(60000, periodic_refresh)  # Refresh every 60 seconds
-    
-    periodic_refresh()
+    refresh_timer = QtCore.QTimer(dashboard_widget)
+    refresh_timer.timeout.connect(refresh_dashboard_kpis)
+    refresh_timer.start(60000)  # Refresh every 60 seconds
+
+    # Make cards clickable for navigation
+    for card_widget, tab_name in card_widgets:
+        if switch_tab_callback and tab_name:
+            def make_nav(target):
+                return lambda: switch_tab_callback(target)
+            card_widget.setCursor(QtCore.Qt.PointingHandCursor)
+            # Store the callback on the widget for click handling
+            card_widget.setProperty("nav_target", tab_name)
+            card_widget.mousePressEvent = make_nav(tab_name)
 
     # --- INDUSTRY SELECTOR ---
     if create_industry_selector_card:
         def on_industry_changed(new_industry_id):
             """Handle industry change confirmation.
-            
+
             The actual industry persistence + tab reload is handled by
             IndustryService.change_industry() called inside the selector.
             This callback only confirms success to the user.
@@ -202,61 +248,79 @@ def create_dashboard_tab(parent, username, role, switch_tab_callback=None):
             try:
                 from industry_service import get_config
                 config = get_config(new_industry_id)
-                messagebox.showinfo("Mode Switched",
+                QtWidgets.QMessageBox.information(
+                    dashboard_widget,
+                    "Mode Switched",
                     f"System operating mode changed to: {config['name']}\n"
-                    f"All tabs and forms have been updated.")
+                    f"All tabs and forms have been updated."
+                )
             except Exception as e:
                 logging.error(f"Industry change confirmation error: {e}", exc_info=True)
-                messagebox.showwarning("Update",
-                    "Industry may have changed. Please verify in the tabs shown.")
+                QtWidgets.QMessageBox.warning(
+                    dashboard_widget,
+                    "Update",
+                    "Industry may have changed. Please verify in the tabs shown."
+                )
 
-        industry_section = create_industry_selector_card(dashboard_frame, on_industry_changed=on_industry_changed)
-        industry_section.pack(fill='x', pady=(0, 30))
+        industry_section = create_industry_selector_card(dashboard_widget, on_industry_changed=on_industry_changed)
+        main_layout.addWidget(industry_section)
 
     # --- Business Configuration Card ---
     try:
         from business_settings import create_business_card
         business_card = create_business_card(
-            dashboard_frame, dashboard_frame, switch_tab_callback
+            dashboard_widget, dashboard_widget, switch_tab_callback
         )
-        business_card.pack(fill='x', pady=(0, 30))
+        main_layout.addWidget(business_card)
     except ImportError:
         logging.debug("Business settings card not available")
 
     # --- Quick Actions Section ---
-    actions_frame = make_card(dashboard_frame, padx=25, pady=20)
-    actions_frame.pack(fill='x', pady=(0, 30))
+    actions_card = make_card(dashboard_widget, padx=25, pady=20)
+    actions_layout = QtWidgets.QVBoxLayout(actions_card)
+    actions_layout.setSpacing(15)
 
-    styled_label(actions_frame, "⚡ Quick Actions", font=SUBHEADING_FONT, foreground=COLOR_TEXT_MAIN).pack(anchor='w', pady=(0, 15))
+    actions_title = styled_label(actions_card, "Quick Actions", font=SUBHEADING_FONT, foreground=COLOR_TEXT_MAIN)
+    actions_layout.addWidget(actions_title)
 
-    quick_actions = ttk.Frame(actions_frame)
-    quick_actions.pack(fill='x')
+    quick_actions_layout = QtWidgets.QHBoxLayout()
+    quick_actions_layout.setSpacing(15)
 
     action_buttons = [
-        ("📦 Add Product", lambda: switch_tab_callback("Inventory") if switch_tab_callback else None),
-        ("💰 New Sale", lambda: switch_tab_callback("Sales") if switch_tab_callback else None),
-        ("📊 Reports", lambda: switch_tab_callback("Reports") if switch_tab_callback else None),
+        ("Add Product", lambda: switch_tab_callback("Inventory") if switch_tab_callback else None, "primary"),
+        ("New Sale", lambda: switch_tab_callback("Sales") if switch_tab_callback else None, "secondary"),
+        ("Reports", lambda: switch_tab_callback("Reports") if switch_tab_callback else None, "secondary"),
     ]
 
-    for i, (text, cmd) in enumerate(action_buttons):
-        btn = make_button(quick_actions, text=text, command=cmd, kind="secondary" if i > 0 else "primary")
-        btn.pack(side="left", padx=(0, 15))
+    for text, cmd, kind in action_buttons:
+        btn = make_button(actions_card, text=text, command=cmd, kind=kind)
+        quick_actions_layout.addWidget(btn)
+
+    quick_actions_layout.addStretch()
+    actions_layout.addLayout(quick_actions_layout)
+    main_layout.addWidget(actions_card)
 
     # --- System & Owner Information Card ---
-    info_frame = make_card(dashboard_frame, padx=25, pady=20)
-    info_frame.pack(fill='x', pady=(0, 20))
+    info_card = make_card(dashboard_widget, padx=25, pady=20)
+    info_layout = QtWidgets.QVBoxLayout(info_card)
+    info_layout.setSpacing(10)
 
-    styled_label(info_frame, "📌 System Overview", font=SUBHEADING_FONT, foreground=COLOR_TEXT_MAIN).pack(anchor='w', pady=(0, 15))
+    info_title = styled_label(info_card, "System Overview", font=SUBHEADING_FONT, foreground=COLOR_TEXT_MAIN)
+    info_layout.addWidget(info_title)
 
     # Two-column layout for info
-    info_cols = ttk.Frame(info_frame)
-    info_cols.pack(fill='x')
-    
-    left_col = ttk.Frame(info_cols)
-    left_col.pack(side="left", fill="x", expand=True)
-    
-    right_col = ttk.Frame(info_cols)
-    right_col.pack(side="left", fill="x", expand=True)
+    info_cols_layout = QtWidgets.QHBoxLayout()
+    info_cols_layout.setSpacing(20)
+
+    left_col = QtWidgets.QWidget()
+    left_col_layout = QtWidgets.QVBoxLayout(left_col)
+    left_col_layout.setContentsMargins(0, 0, 0, 0)
+    left_col_layout.setSpacing(5)
+
+    right_col = QtWidgets.QWidget()
+    right_col_layout = QtWidgets.QVBoxLayout(right_col)
+    right_col_layout.setContentsMargins(0, 0, 0, 0)
+    right_col_layout.setSpacing(5)
 
     settings = load_settings()
     company_name = settings.get("company_name", "Mintaka Sphere Inventory System")
@@ -265,78 +329,114 @@ def create_dashboard_tab(parent, username, role, switch_tab_callback=None):
     tax_rate = settings.get("tax_rate", "0")
 
     # Left column - System Info
-    styled_label(left_col, f"🏢 Company: {company_name}", font=FONT_SMALL, foreground=COLOR_TEXT_MAIN).pack(anchor='w', pady=2)
-    styled_label(left_col, f"📧 Support: {support_email}", font=FONT_SMALL, foreground=COLOR_TEXT_MUTED).pack(anchor='w', pady=2)
-    styled_label(left_col, f"💰 Currency: {currency} | Tax: {float(tax_rate):.1f}%", font=FONT_SMALL, foreground=COLOR_TEXT_MUTED).pack(anchor='w', pady=2)
+    left_col_layout.addWidget(styled_label(left_col, f"Company: {company_name}", font=FONT_SMALL, foreground=COLOR_TEXT_MAIN))
+    left_col_layout.addWidget(styled_label(left_col, f"Support: {support_email}", font=FONT_SMALL, foreground=COLOR_TEXT_MUTED))
+    left_col_layout.addWidget(styled_label(left_col, f"Currency: {currency} | Tax: {float(tax_rate):.1f}%", font=FONT_SMALL, foreground=COLOR_TEXT_MUTED))
+    left_col_layout.addStretch()
 
     # Right column - Industry & User Info
-    styled_label(right_col, f"🏭 Industry: {config.industry_name} {config.icon}", font=FONT_SMALL, foreground=COLOR_TEXT_MAIN).pack(anchor='w', pady=2)
-    styled_label(right_col, f"👤 User: {username.capitalize()} | Role: {role.upper()}", font=FONT_SMALL, foreground=COLOR_TEXT_MUTED).pack(anchor='w', pady=2)
-    styled_label(right_col, f"💾 Software: Mintaka Sphere IMS v1.0.0 | Status: Active", font=FONT_SMALL, foreground=COLOR_SUCCESS).pack(anchor='w', pady=2)
-    
+    right_col_layout.addWidget(styled_label(right_col, f"Industry: {config.industry_name} {config.icon}", font=FONT_SMALL, foreground=COLOR_TEXT_MAIN))
+    right_col_layout.addWidget(styled_label(right_col, f"User: {username.capitalize()} | Role: {role.upper()}", font=FONT_SMALL, foreground=COLOR_TEXT_MUTED))
+    right_col_layout.addWidget(styled_label(right_col, "Software: Mintaka Sphere IMS v1.0.0 | Status: Active", font=FONT_SMALL, foreground=COLOR_SUCCESS))
+    right_col_layout.addStretch()
+
+    info_cols_layout.addWidget(left_col, stretch=1)
+    info_cols_layout.addWidget(right_col, stretch=1)
+    info_layout.addLayout(info_cols_layout)
+    main_layout.addWidget(info_card)
+
     # --- Administrative Panel (Admins Only) ---
     if role in ["admin", "OWNER_ADMIN"]:
-        admin_card = make_card(dashboard_frame, padx=25, pady=20)
-        admin_card.pack(fill='x', pady=(0, 20))
-        
-        styled_label(admin_card, "🛠️ Administrative Controls", font=SUBHEADING_FONT, foreground=COLOR_TEXT_MAIN).pack(anchor='w', pady=(0, 15))
-        
-        admin_controls = ttk.Frame(admin_card)
-        admin_controls.pack(fill='x')
-        
+        admin_card = make_card(dashboard_widget, padx=25, pady=20)
+        admin_layout = QtWidgets.QVBoxLayout(admin_card)
+        admin_layout.setSpacing(15)
+
+        admin_title = styled_label(admin_card, "Administrative Controls", font=SUBHEADING_FONT, foreground=COLOR_TEXT_MAIN)
+        admin_layout.addWidget(admin_title)
+
+        admin_controls_layout = QtWidgets.QHBoxLayout()
+        admin_controls_layout.setSpacing(15)
+
         # User Management
         if open_user_manager:
-            make_button(admin_controls, "👥 Manage Users", 
-                       command=lambda: open_user_manager(dashboard_frame, current_user=username), 
-                       kind="secondary").pack(side="left", padx=(0, 15))
-            
+            admin_controls_layout.addWidget(
+                make_button(admin_card, "Manage Users",
+                           command=lambda: open_user_manager(dashboard_widget, current_user=username),
+                           kind="secondary")
+            )
+
         # Audit Log
         if open_audit_viewer:
-            make_button(admin_controls, "🔍 Audit Logs", 
-                       command=lambda: open_audit_viewer(dashboard_frame, current_user=username), 
-                       kind="secondary").pack(side="left", padx=(0, 15))
-            
+            admin_controls_layout.addWidget(
+                make_button(admin_card, "Audit Logs",
+                           command=lambda: open_audit_viewer(dashboard_widget, current_user=username),
+                           kind="secondary")
+            )
+
         # Owner Specific Tools
         if role == "OWNER_ADMIN" and open_owner_dashboard:
-            make_button(admin_controls, "👑 Owner Dashboard", 
-                       command=lambda: open_owner_dashboard(dashboard_frame), 
-                       kind="primary").pack(side="left", padx=(0, 15))
-            
+            admin_controls_layout.addWidget(
+                make_button(admin_card, "Owner Dashboard",
+                           command=lambda: open_owner_dashboard(dashboard_widget),
+                           kind="primary")
+            )
+
         # Quick Settings
         def open_settings():
             s = load_settings()
-            hour = simpledialog.askinteger("Backup Hour", "Hour (0-23):", initialvalue=s.get("backup_hour", 2))
-            if hour is not None:
+            hour, ok = QtWidgets.QInputDialog.getInt(
+                dashboard_widget,
+                "Backup Hour",
+                "Hour (0-23):",
+                value=s.get("backup_hour", 2),
+                min=0,
+                max=23
+            )
+            if ok:
                 save_settings({"backup_hour": hour})
-                messagebox.showinfo("Settings", "Backup settings saved.")
+                QtWidgets.QMessageBox.information(dashboard_widget, "Settings", "Backup settings saved.")
 
-        make_button(admin_controls, "⚙️ Settings", command=open_settings, kind="secondary").pack(side="left")
+        admin_controls_layout.addWidget(
+            make_button(admin_card, "Settings", command=open_settings, kind="secondary")
+        )
 
         # System Health Check
         try:
             from auto_issue_finder import check_and_show_issues
-            make_button(admin_controls, "🩺 Health Check",
-                       command=lambda: check_and_show_issues(dashboard_frame),
-                       kind="secondary").pack(side="left", padx=(0, 15))
+            admin_controls_layout.addWidget(
+                make_button(admin_card, "Health Check",
+                           command=lambda: check_and_show_issues(dashboard_widget),
+                           kind="secondary")
+            )
         except ImportError:
             pass
 
         # Developer Dashboard
         try:
             from dev_dashboard import open_dev_dashboard
-            make_button(admin_controls, "🛠️ Dev Tools",
-                       command=lambda: open_dev_dashboard(dashboard_frame),
-                       kind="secondary").pack(side="left", padx=(0, 15))
+            admin_controls_layout.addWidget(
+                make_button(admin_card, "Dev Tools",
+                           command=lambda: open_dev_dashboard(dashboard_widget),
+                           kind="secondary")
+            )
         except ImportError:
             pass
 
         # Error Dashboard
         try:
             from error_dashboard_widget import open_error_dashboard
-            make_button(admin_controls, "🚨 Error Dashboard",
-                       command=lambda: open_error_dashboard(dashboard_frame),
-                       kind="secondary").pack(side="left", padx=(0, 15))
+            admin_controls_layout.addWidget(
+                make_button(admin_card, "Error Dashboard",
+                           command=lambda: open_error_dashboard(dashboard_widget),
+                           kind="secondary")
+            )
         except ImportError:
             pass
 
-    return dashboard_frame
+        admin_controls_layout.addStretch()
+        admin_layout.addLayout(admin_controls_layout)
+        main_layout.addWidget(admin_card)
+
+    main_layout.addStretch()
+
+    return dashboard_widget

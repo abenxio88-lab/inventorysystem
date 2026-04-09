@@ -5,8 +5,7 @@ Return Merchandise Authorization and returns processing.
 Phase 5 - Complete Implementation
 """
 
-import tkinter as tk
-from tkinter import ttk, messagebox
+from PySide6 import QtWidgets, QtCore, QtGui
 import logging
 from datetime import datetime
 
@@ -23,39 +22,50 @@ def create_returns_tab(parent, current_user=None):
     """
     Creates the returns/RMA management tab.
     """
-    window = ttk.Frame(parent, padding=15)
+    window = QtWidgets.QWidget()
+    main_layout = QtWidgets.QVBoxLayout(window)
+    main_layout.setContentsMargins(15, 15, 15, 15)
+    main_layout.setSpacing(10)
 
     # Header
-    header_frame = ttk.Frame(window)
-    header_frame.pack(fill="x", pady=(0, 15))
-
-    styled_label(header_frame, "🔄 Returns & RMA", font=FONT_HEADING).pack(side=tk.LEFT)
+    header_frame = QtWidgets.QWidget()
+    header_layout = QtWidgets.QHBoxLayout(header_frame)
+    header_layout.setContentsMargins(0, 0, 0, 15)
+    styled_label(header_frame, "Returns & RMA", font=FONT_HEADING)
+    header_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft)
+    main_layout.addWidget(header_frame)
 
     # New Return button
     def open_new_return():
         open_create_return_dialog(window, current_user=current_user)
 
-    make_button(header_frame, "➕ New Return", command=open_new_return, kind="warning").pack(side=tk.RIGHT)
+    new_btn = make_button(header_frame, "New Return", command=open_new_return, kind="warning")
+    header_layout.addStretch()
+    header_layout.addWidget(new_btn)
 
     # Summary cards
-    summary_frame = ttk.Frame(window)
-    summary_frame.pack(fill="x", pady=(0, 15))
-    summary_frame.grid_columnconfigure((0, 1, 2, 3), weight=1)
+    summary_frame = QtWidgets.QWidget()
+    summary_layout = QtWidgets.QHBoxLayout(summary_frame)
+    summary_layout.setContentsMargins(0, 0, 0, 15)
+    summary_layout.setSpacing(8)
+    main_layout.addWidget(summary_frame)
 
-    def create_summary_card(parent, title, value, col):
+    def create_summary_card(parent, title, value):
         card = make_card(parent, padding=12)
-        card.grid(row=0, column=col, padx=8, sticky="nsew")
-
-        styled_label(card, text=title, font=("Segoe UI", 9), foreground="#6c757d").pack(anchor="w")
+        card_layout = QtWidgets.QVBoxLayout(card)
+        card_layout.setContentsMargins(8, 8, 8, 8)
+        title_lbl = styled_label(card, text=title, font=("Segoe UI", 9), foreground="#6c757d")
+        card_layout.addWidget(title_lbl)
         value_label = styled_label(card, text=str(value), font=("Segoe UI", 20, "bold"), foreground=COLOR_PRIMARY)
-        value_label.pack(anchor="w", pady=(3, 0))
-
+        card_layout.addWidget(value_label)
+        card_layout.addStretch()
+        summary_layout.addWidget(card)
         return value_label
 
-    pending_lbl = create_summary_card(summary_frame, "Pending", 0, 0)
-    approved_lbl = create_summary_card(summary_frame, "Approved", 0, 1)
-    refunded_lbl = create_summary_card(summary_frame, "Refunded", 0, 2)
-    total_lbl = create_summary_card(summary_frame, "Total Returns", 0, 3)
+    pending_lbl = create_summary_card(summary_frame, "Pending", 0)
+    approved_lbl = create_summary_card(summary_frame, "Approved", 0)
+    refunded_lbl = create_summary_card(summary_frame, "Refunded", 0)
+    total_lbl = create_summary_card(summary_frame, "Total Returns", 0)
 
     window.summary_labels = {
         'pending': pending_lbl,
@@ -65,34 +75,32 @@ def create_returns_tab(parent, current_user=None):
     }
 
     # Filter toolbar
-    toolbar_frame = ttk.Frame(window)
-    toolbar_frame.pack(fill="x", pady=(0, 10))
+    toolbar_frame = QtWidgets.QWidget()
+    toolbar_layout = QtWidgets.QHBoxLayout(toolbar_frame)
+    toolbar_layout.setContentsMargins(0, 0, 0, 10)
+    main_layout.addWidget(toolbar_frame)
 
-    styled_label(toolbar_frame, "Status:").pack(side=tk.LEFT, padx=(0, 10))
-
-    status_var = tk.StringVar(value="all")
-    status_combo = ttk.Combobox(
-        toolbar_frame,
-        textvariable=status_var,
-        values=["all", "pending", "approved", "refunded", "rejected"],
-        state="readonly",
-        width=15
-    )
-    status_combo.pack(side=tk.LEFT, padx=5)
+    styled_label(toolbar_frame, "Status:")
+    status_combo = QtWidgets.QComboBox()
+    status_combo.addItems(["all", "pending", "approved", "refunded", "rejected"])
+    toolbar_layout.addWidget(status_combo)
 
     def apply_filter():
         refresh_returns()
 
-    make_button(toolbar_frame, "Apply", command=apply_filter, kind="primary").pack(side=tk.LEFT, padx=10)
-    make_button(toolbar_frame, "Clear", command=lambda: (status_var.set("all"), refresh_returns()), kind="secondary").pack(side=tk.LEFT)
+    apply_btn = make_button(toolbar_frame, "Apply", command=apply_filter, kind="primary")
+    toolbar_layout.addWidget(apply_btn)
+    clear_btn = make_button(toolbar_frame, "Clear", command=lambda: (status_combo.setCurrentText("all"), refresh_returns()), kind="secondary")
+    toolbar_layout.addWidget(clear_btn)
+    toolbar_layout.addStretch()
 
     # Returns table
     table_frame = make_card(window, padding=10)
-    table_frame.pack(fill="both", expand=True)
+    table_layout = QtWidgets.QHBoxLayout(table_frame)
+    table_layout.setContentsMargins(0, 0, 0, 0)
+    main_layout.addWidget(table_frame)
 
     columns = ("return_number", "customer", "date", "reason", "amount", "status")
-    tree = ttk.Treeview(table_frame, columns=columns, show="headings")
-
     column_map = {
         "return_number": ("Return #", 120),
         "customer": ("Customer", 200),
@@ -102,54 +110,64 @@ def create_returns_tab(parent, current_user=None):
         "status": ("Status", 100)
     }
 
-    for col, (label_text, width) in column_map.items():
-        tree.heading(col, text=label_text, anchor="w")
-        tree.column(col, width=width, anchor="w", minwidth=80)
+    tree = QtWidgets.QTableWidget()
+    tree.setColumnCount(len(columns))
+    tree.setHorizontalHeaderLabels([column_map[c][0] for c in columns])
+    tree.horizontalHeader().setStretchLastSection(True)
+    tree.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Interactive)
+    tree.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+    tree.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
 
-    # Scrollbar
-    scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tree.yview)
-    tree.configure(yscrollcommand=scrollbar.set)
-    scrollbar.pack(side=tk.RIGHT, fill="y")
-    tree.pack(side=tk.LEFT, fill="both", expand=True)
+    for i, col in enumerate(columns):
+        tree.setColumnWidth(i, column_map[col][1])
+
+    table_layout.addWidget(tree)
 
     # Action buttons
-    action_frame = ttk.Frame(window)
-    action_frame.pack(fill="x", pady=(10, 0))
+    action_frame = QtWidgets.QWidget()
+    action_layout = QtWidgets.QHBoxLayout(action_frame)
+    action_layout.setContentsMargins(0, 10, 0, 0)
+    main_layout.addWidget(action_frame)
 
     def on_view_details():
-        sel = tree.selection()
-        if not sel:
-            messagebox.showinfo("Select", "Please select a return")
+        selected_rows = tree.selectionModel().selectedRows()
+        if not selected_rows:
+            QtWidgets.QMessageBox.information(window, "Select", "Please select a return")
             return
 
-        return_id = tree.item(sel[0], 'tags')[0] if tree.item(sel[0], 'tags') else None
+        row = selected_rows[0].row()
+        return_id = tree.item(row, 0).text() if tree.item(row, 0) else None
 
         if return_id:
-            open_return_details(window, return_id=int(return_id), current_user=current_user)
+            open_return_details(window, return_number=return_id, current_user=current_user)
 
     def on_approve():
-        sel = tree.selection()
-        if not sel:
-            messagebox.showinfo("Select", "Please select a return")
+        selected_rows = tree.selectionModel().selectedRows()
+        if not selected_rows:
+            QtWidgets.QMessageBox.information(window, "Select", "Please select a return")
             return
 
-        return_id = tree.item(sel[0], 'tags')[0] if tree.item(sel[0], 'tags') else None
+        row = selected_rows[0].row()
+        return_id = tree.item(row, 0).text() if tree.item(row, 0) else None
 
         if return_id:
             approve_return(return_id, refresh_callback=refresh_returns)
 
-    make_button(action_frame, "👁️ View Details", command=on_view_details, kind="primary").pack(side=tk.LEFT, padx=5)
-    make_button(action_frame, "✓ Approve Return", command=on_approve, kind="success").pack(side=tk.LEFT, padx=5)
+    view_btn = make_button(action_frame, "View Details", command=on_view_details, kind="primary")
+    action_layout.addWidget(view_btn)
+    approve_btn = make_button(action_frame, "Approve Return", command=on_approve, kind="success")
+    action_layout.addWidget(approve_btn)
+    action_layout.addStretch()
 
     # Store state
-    window.status_var = status_var
+    window.status_combo = status_combo
     window.tree = tree
 
     def refresh_returns():
         """Refresh returns list from database through services."""
-        tree.delete(*tree.get_children())
+        tree.setRowCount(0)
 
-        status_filter = status_var.get()
+        status_filter = status_combo.currentText()
         status_arg = None if status_filter == 'all' else status_filter
         returns = svc.return_svc.get_all_returns(status=status_arg)
 
@@ -159,24 +177,22 @@ def create_returns_tab(parent, current_user=None):
             if ret['status'] in status_counts:
                 status_counts[ret['status']] += 1
 
-        window.summary_labels['pending'].config(text=str(status_counts['pending']))
-        window.summary_labels['approved'].config(text=str(status_counts['approved']))
-        window.summary_labels['refunded'].config(text=str(status_counts['refunded']))
-        window.summary_labels['total'].config(text=str(status_counts['total']))
+        window.summary_labels['pending'].setText(str(status_counts['pending']))
+        window.summary_labels['approved'].setText(str(status_counts['approved']))
+        window.summary_labels['refunded'].setText(str(status_counts['refunded']))
+        window.summary_labels['total'].setText(str(status_counts['total']))
 
         # Populate table
-        for ret in returns:
+        for row_idx, ret in enumerate(returns):
             status_text = ret['status'].replace('_', ' ').title()
-            tags = (str(ret['return_id']),)
-
-            tree.insert("", "end", values=(
-                ret['return_number'],
-                ret['customer_name'],
-                ret['return_date'][:10] if ret['return_date'] else 'N/A',
-                ret['reason'][:50] + ('...' if len(ret['reason'] or '') > 50 else ''),
-                f"Rs. {ret['total_refund']:,.2f}" if ret['total_refund'] else "Rs. 0.00",
-                status_text
-            ), tags=tags)
+            tree.insertRow(row_idx)
+            tree.setItem(row_idx, 0, QtWidgets.QTableWidgetItem(ret['return_number']))
+            tree.setItem(row_idx, 1, QtWidgets.QTableWidgetItem(ret['customer_name']))
+            tree.setItem(row_idx, 2, QtWidgets.QTableWidgetItem(ret['return_date'][:10] if ret['return_date'] else 'N/A'))
+            reason_text = ret['reason'][:50] + ('...' if len(ret['reason'] or '') > 50 else '')
+            tree.setItem(row_idx, 3, QtWidgets.QTableWidgetItem(reason_text))
+            tree.setItem(row_idx, 4, QtWidgets.QTableWidgetItem(f"Rs. {ret['total_refund']:,.2f}" if ret['total_refund'] else "Rs. 0.00"))
+            tree.setItem(row_idx, 5, QtWidgets.QTableWidgetItem(status_text))
 
     window.refresh_returns = refresh_returns
     refresh_returns()
@@ -186,106 +202,106 @@ def create_returns_tab(parent, current_user=None):
 
 def open_create_return_dialog(parent, current_user=None):
     """Dialog to create a new return."""
-    dlg = tk.Toplevel(parent)
-    dlg.title("Create Return/RMA")
-    dlg.geometry("900x800")
-    dlg.resizable(True, True)
-    dlg.minsize(750, 650)
-    dlg.transient(parent)
-    dlg.grab_set()
+    dlg = QtWidgets.QDialog(parent)
+    dlg.setWindowTitle("Create Return/RMA")
+    dlg.resize(900, 800)
+    dlg.setModal(True)
 
-    content = ttk.Frame(dlg, padding=20)
-    content.pack(fill=tk.BOTH, expand=True)
+    main_layout = QtWidgets.QVBoxLayout(dlg)
+    main_layout.setContentsMargins(20, 20, 20, 20)
 
     # Heading
-    styled_label(content, "🔄 New Return/RMA", font=FONT_HEADING).pack(anchor=tk.W, pady=(0, 15))
+    styled_label(dlg, "New Return/RMA", font=FONT_HEADING)
 
     # Customer info
-    customer_frame = ttk.LabelFrame(content, text="Customer Information", padding=15)
-    customer_frame.pack(fill=tk.X, pady=(0, 15))
-    customer_frame.grid_columnconfigure(0, weight=0, minsize=150)
-    customer_frame.grid_columnconfigure(1, weight=1)
+    customer_frame = QtWidgets.QGroupBox("Customer Information")
+    customer_layout = QtWidgets.QFormLayout(customer_frame)
+    customer_layout.setSpacing(5)
+    main_layout.addWidget(customer_frame)
 
-    styled_label(customer_frame, "Customer Name *:", font=FONT_BOLD).grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
-    customer_name_var = tk.StringVar()
-    customer_name_entry = ttk.Entry(customer_frame, textvariable=customer_name_var, width=30)
-    customer_name_entry.grid(row=1, column=0, sticky=tk.EW, padx=5, pady=5)
+    customer_name_entry = QtWidgets.QLineEdit()
+    customer_layout.addRow(styled_label(customer_frame, "Customer Name *:", font=FONT_BOLD), customer_name_entry)
 
-    styled_label(customer_frame, "Email:", font=FONT_BOLD).grid(row=0, column=1, sticky=tk.W, padx=5, pady=5)
-    customer_email_var = tk.StringVar()
-    customer_email_entry = ttk.Entry(customer_frame, textvariable=customer_email_var, width=25)
-    customer_email_entry.grid(row=1, column=1, sticky=tk.EW, padx=5, pady=5)
+    customer_email_entry = QtWidgets.QLineEdit()
+    customer_layout.addRow(styled_label(customer_frame, "Email:", font=FONT_BOLD), customer_email_entry)
 
-    styled_label(customer_frame, "Phone:", font=FONT_BOLD).grid(row=2, column=0, sticky=tk.W, padx=5, pady=5)
-    customer_phone_var = tk.StringVar()
-    customer_phone_entry = ttk.Entry(customer_frame, textvariable=customer_phone_var, width=30)
-    customer_phone_entry.grid(row=3, column=0, sticky=tk.EW, padx=5, pady=5)
+    customer_phone_entry = QtWidgets.QLineEdit()
+    customer_layout.addRow(styled_label(customer_frame, "Phone:", font=FONT_BOLD), customer_phone_entry)
 
     # Return details
-    details_frame = ttk.LabelFrame(content, text="Return Details", padding=15)
-    details_frame.pack(fill=tk.X, pady=(0, 15))
-    details_frame.grid_columnconfigure(0, weight=0, minsize=150)
-    details_frame.grid_columnconfigure(1, weight=1)
+    details_frame = QtWidgets.QGroupBox("Return Details")
+    details_layout = QtWidgets.QFormLayout(details_frame)
+    details_layout.setSpacing(5)
+    main_layout.addWidget(details_frame)
 
     # Return number (auto-generated)
     return_number = f"RMA-{datetime.now().strftime('%Y%m%d%H%M')}"
-    styled_label(details_frame, "Return Number:", font=FONT_BOLD).grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
-    return_number_var = tk.StringVar(value=return_number)
-    return_number_entry = ttk.Entry(details_frame, textvariable=return_number_var, width=20, state='readonly')
-    return_number_entry.grid(row=1, column=0, sticky=tk.W, padx=5, pady=5)
+    return_number_edit = QtWidgets.QLineEdit(return_number)
+    return_number_edit.setReadOnly(True)
+    details_layout.addRow(styled_label(details_frame, "Return Number:", font=FONT_BOLD), return_number_edit)
 
     # Return date
-    styled_label(details_frame, "Return Date *:", font=FONT_BOLD).grid(row=0, column=1, sticky=tk.W, padx=5, pady=5)
-    return_date_var = tk.StringVar(value=datetime.now().strftime('%Y-%m-%d'))
-    return_date_entry = ttk.Entry(details_frame, textvariable=return_date_var, width=15)
-    return_date_entry.grid(row=1, column=1, sticky=tk.W, padx=5, pady=5)
+    return_date_edit = QtWidgets.QLineEdit(datetime.now().strftime('%Y-%m-%d'))
+    details_layout.addRow(styled_label(details_frame, "Return Date *:", font=FONT_BOLD), return_date_edit)
 
     # Reason
-    styled_label(details_frame, "Reason *:", font=FONT_BOLD).grid(row=2, column=0, sticky=tk.W, padx=5, pady=5)
-    reason_var = tk.StringVar()
-    reason_combo = ttk.Combobox(details_frame, textvariable=reason_var, values=[
+    reason_combo = QtWidgets.QComboBox()
+    reason_combo.addItems([
         "Defective Product", "Wrong Item", "Damaged in Shipping",
         "Not as Described", "Changed Mind", "Other"
-    ], state="readonly", width=40)
-    reason_combo.grid(row=3, column=0, columnspan=2, sticky=tk.EW, padx=5, pady=5)
+    ])
+    details_layout.addRow(styled_label(details_frame, "Reason *:", font=FONT_BOLD), reason_combo)
 
     # Items section
-    styled_label(content, "Return Items:", font=FONT_BOLD).pack(anchor=tk.W, pady=(10, 5))
+    styled_label(dlg, "Return Items:", font=FONT_BOLD)
 
-    items_frame = make_card(content, padding=10)
-    items_frame.pack(fill=tk.BOTH, expand=True)
+    items_frame = make_card(dlg, padding=10)
+    items_main_layout = QtWidgets.QVBoxLayout(items_frame)
+    main_layout.addWidget(items_frame)
 
     # Add item row
-    add_frame = ttk.Frame(items_frame)
-    add_frame.pack(fill=tk.X, pady=(0, 10))
+    add_frame = QtWidgets.QWidget()
+    add_layout = QtWidgets.QHBoxLayout(add_frame)
+    add_layout.setContentsMargins(0, 0, 0, 10)
+    items_main_layout.addWidget(add_frame)
 
-    styled_label(add_frame, "Product:").pack(side=tk.LEFT, padx=5)
+    styled_label(add_frame, "Product:")
 
-    product_var = tk.StringVar()
-    product_combo = ttk.Combobox(add_frame, textvariable=product_var, state="readonly", width=35)
-    product_combo.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+    product_combo = QtWidgets.QComboBox()
+    add_layout.addWidget(product_combo, stretch=1)
 
     # Load products via service
     products = svc.inventory.get_all_products(active_only=True)
-
     product_data = [(p['id'], f"{p['model']} (Rs. {p['selling_price']})") for p in products]
-    product_combo['values'] = [p[1] for p in product_data]
+    product_combo.addItems([p[1] for p in product_data])
 
-    styled_label(add_frame, "Qty:").pack(side=tk.LEFT, padx=(15, 5))
+    styled_label(add_frame, "Qty:")
+    qty_edit = QtWidgets.QLineEdit("1")
+    qty_edit.setFixedWidth(60)
+    add_layout.addWidget(qty_edit)
 
-    qty_var = tk.StringVar(value="1")
-    qty_entry = ttk.Entry(add_frame, textvariable=qty_var, width=8)
-    qty_entry.pack(side=tk.LEFT, padx=5)
+    # Items tree
+    items_tree = QtWidgets.QTableWidget()
+    items_tree.setColumnCount(5)
+    items_tree.setHorizontalHeaderLabels(["Product", "Quantity", "Unit Price", "Total", "Actions"])
+    items_tree.horizontalHeader().setStretchLastSection(True)
+    items_tree.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Interactive)
+    items_tree.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+    items_tree.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+    items_tree.setColumnWidth(0, 200)
+    for i in range(1, 5):
+        items_tree.setColumnWidth(i, 100)
+    items_main_layout.addWidget(items_tree)
 
-    # Add button
+    # Return items storage
     return_items = []
 
     def add_item():
-        product_sel = product_var.get()
-        qty = qty_var.get()
+        product_sel = product_combo.currentText()
+        qty = qty_edit.text()
 
         if not product_sel:
-            messagebox.showerror("Error", "Please select a product")
+            QtWidgets.QMessageBox.critical(dlg, "Error", "Please select a product")
             return
 
         try:
@@ -293,7 +309,7 @@ def open_create_return_dialog(parent, current_user=None):
             if qty_int <= 0:
                 raise ValueError("must be positive")
         except ValueError as e:
-            messagebox.showerror("Error", f"Invalid quantity: {e}")
+            QtWidgets.QMessageBox.critical(dlg, "Error", f"Invalid quantity: {e}")
             return
 
         # Find product
@@ -321,89 +337,78 @@ def open_create_return_dialog(parent, current_user=None):
         })
 
         # Update tree
-        items_tree.insert("", "end", values=(
-            product_name,
-            qty_int,
-            f"Rs. {unit_price:,.2f}",
-            f"Rs. {line_total:,.2f}",
-            "🗑️ Remove"
-        ))
+        row = items_tree.rowCount()
+        items_tree.insertRow(row)
+        items_tree.setItem(row, 0, QtWidgets.QTableWidgetItem(product_name))
+        items_tree.setItem(row, 1, QtWidgets.QTableWidgetItem(str(qty_int)))
+        items_tree.setItem(row, 2, QtWidgets.QTableWidgetItem(f"Rs. {unit_price:,.2f}"))
+        items_tree.setItem(row, 3, QtWidgets.QTableWidgetItem(f"Rs. {line_total:,.2f}"))
+        items_tree.setItem(row, 4, QtWidgets.QTableWidgetItem("Remove"))
 
-        product_var.set("")
-        qty_var.set("1")
+        product_combo.setCurrentIndex(-1)
+        qty_edit.setText("1")
+        update_total()
 
-    def on_item_click(event):
-        sel = items_tree.selection()
-        if not sel:
-            return
-
-        item = items_tree.item(sel[0])
-        if item['values'][4] == "🗑️ Remove":
-            index = items_tree.index(sel[0])
-            if 0 <= index < len(return_items):
-                return_items.pop(index)
-                items_tree.delete(sel[0])
+    def on_item_click(index):
+        row = index.row()
+        col = index.column()
+        if col == 4:
+            if 0 <= row < len(return_items):
+                return_items.pop(row)
+                items_tree.removeRow(row)
                 update_total()
 
-    make_button(add_frame, "➕ Add Item", command=add_item, kind="primary").pack(side=tk.LEFT, padx=10)
+    items_tree.clicked.connect(on_item_click)
 
-    # Items tree
-    items_frame2 = ttk.Frame(items_frame)
-    items_frame2.pack(fill=tk.BOTH, expand=True)
-
-    columns = ("product", "quantity", "unit_price", "total", "actions")
-    items_tree = ttk.Treeview(items_frame2, columns=columns, show="headings", height=8)
-
-    for col in columns:
-        items_tree.heading(col, text=col.replace('_', ' ').title())
-        items_tree.column(col, width=100 if col != "product" else 200)
-
-    items_tree.pack(fill=tk.BOTH, expand=True)
-    items_tree.bind("<Button-1>", on_item_click)
+    add_btn = make_button(add_frame, "Add Item", command=add_item, kind="primary")
+    add_layout.addWidget(add_btn)
 
     # Total
-    total_var = tk.StringVar(value="Total Refund: Rs. 0.00")
-    total_label = styled_label(items_frame, textvariable=total_var, font=("Segoe UI", 12, "bold"), foreground=COLOR_DANGER)
-    total_label.pack(anchor=tk.E, pady=10)
+    total_label = styled_label(items_frame, "Total Refund: Rs. 0.00", font=("Segoe UI", 12, "bold"), foreground=COLOR_DANGER)
+    total_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight)
+    items_main_layout.addWidget(total_label)
 
     def update_total():
         total = sum(item['line_total'] for item in return_items)
-        total_var.set(f"Total Refund: Rs. {total:,.2f}")
+        total_label.setText(f"Total Refund: Rs. {total:,.2f}")
 
     # Notes
-    styled_label(content, "Notes:", font=FONT_BOLD).pack(anchor=tk.W, pady=(10, 5))
-    notes_text = tk.Text(content, height=3)
-    notes_text.pack(fill=tk.X, pady=(0, 10))
+    styled_label(dlg, "Notes:", font=FONT_BOLD)
+    notes_edit = QtWidgets.QTextEdit()
+    notes_edit.setMaximumHeight(80)
+    main_layout.addWidget(notes_edit)
 
     # Buttons
-    btn_frame = ttk.Frame(content)
-    btn_frame.pack(fill=tk.X, pady=(10, 0))
+    btn_frame = QtWidgets.QWidget()
+    btn_layout = QtWidgets.QHBoxLayout(btn_frame)
+    btn_layout.setContentsMargins(0, 10, 0, 0)
+    main_layout.addWidget(btn_frame)
 
     def save_return():
-        customer_name = customer_name_var.get().strip()
-        customer_email = customer_email_var.get().strip()
-        customer_phone = customer_phone_var.get().strip()
-        return_date = return_date_var.get().strip()
-        reason = reason_var.get().strip()
-        notes = notes_text.get("1.0", tk.END).strip()
+        customer_name = customer_name_entry.text().strip()
+        customer_email = customer_email_entry.text().strip()
+        customer_phone = customer_phone_entry.text().strip()
+        return_date = return_date_edit.text().strip()
+        reason = reason_combo.currentText()
+        notes = notes_edit.toPlainText().strip()
 
         if not customer_name:
-            messagebox.showerror("Error", "Customer name required")
+            QtWidgets.QMessageBox.critical(dlg, "Error", "Customer name required")
             return
 
         if not reason:
-            messagebox.showerror("Error", "Please select a reason")
+            QtWidgets.QMessageBox.critical(dlg, "Error", "Please select a reason")
             return
 
         if not return_items:
-            messagebox.showerror("Error", "Please add at least one item")
+            QtWidgets.QMessageBox.critical(dlg, "Error", "Please add at least one item")
             return
 
         total_refund = sum(item['line_total'] for item in return_items)
 
         try:
             return_data = {
-                'return_number': return_number_var.get(),
+                'return_number': return_number_edit.text(),
                 'customer_name': customer_name,
                 'customer_email': customer_email,
                 'customer_phone': customer_phone,
@@ -417,48 +422,51 @@ def open_create_return_dialog(parent, current_user=None):
 
             svc.return_svc.create_return(return_data, return_items, username=current_user)
 
-            messagebox.showinfo("Success", f"Return created: {return_number_var.get()}")
-            dlg.destroy()
+            QtWidgets.QMessageBox.information(dlg, "Success", f"Return created: {return_number_edit.text()}")
+            dlg.accept()
 
             if hasattr(parent, 'refresh_returns'):
                 parent.refresh_returns()
 
         except Exception as e:
             logging.exception("Failed to create return")
-            messagebox.showerror("Error", f"Failed to create return: {e}")
+            QtWidgets.QMessageBox.critical(dlg, "Error", f"Failed to create return: {e}")
 
-    make_button(btn_frame, "💾 Create Return", command=save_return, kind="warning").pack(side=tk.LEFT, padx=5)
-    make_button(btn_frame, "Cancel", command=dlg.destroy, kind="secondary").pack(side=tk.LEFT, padx=5)
+    save_btn = make_button(btn_frame, "Create Return", command=save_return, kind="warning")
+    btn_layout.addWidget(save_btn)
+    cancel_btn = make_button(btn_frame, "Cancel", command=dlg.reject, kind="secondary")
+    btn_layout.addWidget(cancel_btn)
+    btn_layout.addStretch()
 
 
-def open_return_details(parent, return_id, current_user=None):
+def open_return_details(parent, return_number, current_user=None):
     """View return details."""
-    dlg = tk.Toplevel(parent)
-    dlg.title("Return Details")
-    dlg.geometry("850x750")
-    dlg.resizable(True, True)
-    dlg.minsize(700, 600)
-    dlg.transient(parent)
-    dlg.grab_set()
+    dlg = QtWidgets.QDialog(parent)
+    dlg.setWindowTitle("Return Details")
+    dlg.resize(850, 750)
+    dlg.setModal(True)
 
-    content = ttk.Frame(dlg, padding=20)
-    content.pack(fill=tk.BOTH, expand=True)
+    main_layout = QtWidgets.QVBoxLayout(dlg)
+    main_layout.setContentsMargins(20, 20, 20, 20)
 
     returns = svc.return_svc.get_all_returns()
-    ret = next((r for r in returns if r['return_id'] == return_id), None)
+    ret = next((r for r in returns if r['return_number'] == return_number), None)
 
     if not ret:
-        styled_label(content, "Return not found", foreground=COLOR_DANGER).pack()
-        ttk.Button(dlg, text="Close", command=dlg.destroy).pack(pady=10)
+        styled_label(dlg, "Return not found", foreground=COLOR_DANGER)
+        close_btn = QtWidgets.QPushButton("Close", dlg)
+        close_btn.clicked.connect(dlg.reject)
+        main_layout.addWidget(close_btn)
         return
 
     # Header
-    styled_label(content, f"Return: {ret['return_number']}", font=FONT_HEADING).pack(anchor=tk.W)
-    styled_label(content, f"Status: {ret['status'].title()}", foreground=COLOR_PRIMARY).pack(anchor=tk.W, pady=(5, 15))
+    styled_label(dlg, f"Return: {ret['return_number']}", font=FONT_HEADING)
+    styled_label(dlg, f"Status: {ret['status'].title()}", foreground=COLOR_PRIMARY)
 
     # Info
-    info_frame = make_card(content, padding=15)
-    info_frame.pack(fill=tk.X)
+    info_frame = make_card(dlg, padding=15)
+    info_layout = QtWidgets.QFormLayout(info_frame)
+    main_layout.addWidget(info_frame)
 
     info = [
         ("Customer:", ret['customer_name']),
@@ -469,51 +477,55 @@ def open_return_details(parent, return_id, current_user=None):
         ("Refund Amount:", f"Rs. {ret['total_refund']:,.2f}"),
     ]
 
-    for label, value in info:
-        frame = ttk.Frame(info_frame)
-        frame.pack(fill=tk.X, pady=3)
-        styled_label(frame, f"{label}", font=("Segoe UI", 10, "bold"), width=15).pack(side=tk.LEFT)
-        styled_label(frame, f"{value}").pack(side=tk.LEFT)
+    for lbl, val in info:
+        info_layout.addRow(label(info_frame, lbl, kind="bold"), label(info_frame, val))
 
     # Items
-    styled_label(content, "Return Items:", font=FONT_BOLD).pack(anchor=tk.W, pady=(15, 5))
+    styled_label(dlg, "Return Items:", font=FONT_BOLD)
 
-    items_frame = make_card(content, padding=10)
-    items_frame.pack(fill=tk.BOTH, expand=True)
+    items_frame = make_card(dlg, padding=10)
+    items_layout = QtWidgets.QVBoxLayout(items_frame)
+    main_layout.addWidget(items_frame)
 
     columns = ("product", "quantity", "unit_price", "total")
-    items_tree = ttk.Treeview(items_frame, columns=columns, show="headings")
-
-    for col in columns:
-        items_tree.heading(col, text=col.replace('_', ' ').title())
-        items_tree.column(col, width=120)
-
-    items_tree.pack(fill=tk.BOTH, expand=True)
+    items_tree = QtWidgets.QTableWidget()
+    items_tree.setColumnCount(len(columns))
+    items_tree.setHorizontalHeaderLabels([col.replace('_', ' ').title() for col in columns])
+    items_tree.horizontalHeader().setStretchLastSection(True)
+    items_tree.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Interactive)
+    items_tree.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+    items_tree.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+    for i in range(4):
+        items_tree.setColumnWidth(i, 120)
+    items_layout.addWidget(items_tree)
 
     # Load return items through service
-    return_items = svc.return_svc.get_return_items(return_id)
-    for row in return_items:
-        items_tree.insert("", "end", values=(
-            row['product_name'],
-            row['quantity'],
-            f"Rs. {row['unit_price']:,.2f}",
-            f"Rs. {row['line_total']:,.2f}"
-        ))
+    return_items = svc.return_svc.get_return_items_by_number(return_number)
+    for row_idx, row in enumerate(return_items):
+        items_tree.insertRow(row_idx)
+        items_tree.setItem(row_idx, 0, QtWidgets.QTableWidgetItem(row['product_name']))
+        items_tree.setItem(row_idx, 1, QtWidgets.QTableWidgetItem(str(row['quantity'])))
+        items_tree.setItem(row_idx, 2, QtWidgets.QTableWidgetItem(f"Rs. {row['unit_price']:,.2f}"))
+        items_tree.setItem(row_idx, 3, QtWidgets.QTableWidgetItem(f"Rs. {row['line_total']:,.2f}"))
 
     # Close button
-    ttk.Button(dlg, text="Close", command=dlg.destroy).pack(pady=10)
+    close_btn = QtWidgets.QPushButton("Close", dlg)
+    close_btn.clicked.connect(dlg.reject)
+    main_layout.addWidget(close_btn)
 
 
-def approve_return(return_id, refresh_callback=None):
+def approve_return(return_number, refresh_callback=None):
     """Approve a return."""
-    if messagebox.askyesno("Confirm", "Approve this return and process refund?"):
+    reply = QtWidgets.QMessageBox.question(None, "Confirm", "Approve this return and process refund?",
+                                           QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No)
+    if reply == QtWidgets.QMessageBox.StandardButton.Yes:
         try:
-            svc.return_svc.approve_return(return_id, username="system")
-            messagebox.showinfo("Success", "Return approved")
+            svc.return_svc.approve_return(return_number, username="system")
+            QtWidgets.QMessageBox.information(None, "Success", "Return approved")
 
             if refresh_callback:
                 refresh_callback()
 
         except Exception as e:
             logging.exception("Failed to approve return")
-            messagebox.showerror("Error", f"Failed to approve return: {e}")
+            QtWidgets.QMessageBox.critical(None, "Error", f"Failed to approve return: {e}")

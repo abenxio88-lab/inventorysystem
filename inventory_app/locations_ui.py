@@ -5,8 +5,7 @@ UI-ONLY layer. All data goes through the service layer.
 After every write, refresh_from_db() reloads fresh data.
 """
 
-import tkinter as tk
-from tkinter import ttk, messagebox
+from PySide6 import QtWidgets, QtCore, QtGui
 import logging
 
 from ui_theme import (
@@ -20,42 +19,67 @@ from app_core import app_state
 
 def create_locations_tab(parent, current_user=None):
     """Creates the locations/warehouse management tab."""
-    window = ttk.Frame(parent, padding=15)
+    window = QtWidgets.QWidget()
+    window.setContentsMargins(15, 15, 15, 15)
+
+    main_layout = QtWidgets.QVBoxLayout(window)
+    main_layout.setContentsMargins(0, 0, 0, 0)
 
     # Header
-    header_frame = ttk.Frame(window)
-    header_frame.pack(fill="x", pady=(0, 15))
+    header_frame = QtWidgets.QWidget()
+    header_layout = QtWidgets.QHBoxLayout(header_frame)
+    header_layout.setContentsMargins(0, 0, 0, 0)
+    header_layout.setSpacing(0)
 
-    styled_label(header_frame, "🏢 Locations & Warehouses", font=FONT_BOLD).pack(side=tk.LEFT)
+    header_label = QtWidgets.QLabel("Locations & Warehouses")
+    header_label.setFont(FONT_BOLD)
+    header_layout.addWidget(header_label)
+    header_layout.addStretch()
 
     def open_add_location():
         _open_location_dialog(window, current_user=current_user, mode="add")
 
-    make_button(header_frame, "➕ Add Location", command=open_add_location, kind="success").pack(side=tk.RIGHT)
+    add_btn = QtWidgets.QPushButton("Add Location")
+    add_btn.clicked.connect(open_add_location)
+    add_btn.setStyleSheet("background-color: #28a745; color: white; padding: 5px 15px; border-radius: 3px;")
+    header_layout.addWidget(add_btn)
+
+    main_layout.addWidget(header_frame)
 
     # Search
-    toolbar = ttk.Frame(window)
-    toolbar.pack(fill="x", pady=(0, 10))
-    styled_label(toolbar, "Search:").pack(side=tk.LEFT, padx=(0, 10))
-    search_var = tk.StringVar()
-    search_entry = entry(toolbar, textvariable=search_var)
-    search_entry.pack(side=tk.LEFT, expand=True, fill="x")
+    toolbar = QtWidgets.QWidget()
+    toolbar_layout = QtWidgets.QHBoxLayout(toolbar)
+    toolbar_layout.setContentsMargins(0, 0, 0, 0)
+
+    search_label = QtWidgets.QLabel("Search:")
+    toolbar_layout.addWidget(search_label)
+
+    search_entry = QtWidgets.QLineEdit()
+    toolbar_layout.addWidget(search_entry, stretch=1)
 
     def apply_search():
-        q = search_var.get().strip()
+        q = search_entry.text().strip()
         refresh_from_db(q if q else None)
 
-    make_button(toolbar, "Search", command=apply_search, kind="primary").pack(side=tk.LEFT, padx=10)
-    make_button(toolbar, "Clear", command=lambda: (search_var.set(""), refresh_from_db()),
-                kind="secondary").pack(side=tk.LEFT)
+    search_btn = QtWidgets.QPushButton("Search")
+    search_btn.clicked.connect(apply_search)
+    search_btn.setStyleSheet("background-color: #007bff; color: white; padding: 5px 15px; border-radius: 3px;")
+    toolbar_layout.addWidget(search_btn)
+
+    clear_btn = QtWidgets.QPushButton("Clear")
+    clear_btn.clicked.connect(lambda: (search_entry.clear(), refresh_from_db()))
+    clear_btn.setStyleSheet("padding: 5px 15px; border-radius: 3px;")
+    toolbar_layout.addWidget(clear_btn)
+
+    main_layout.addWidget(toolbar)
 
     # Table
-    table_frame = make_card(window, padx=10, pady=10)
-    table_frame.pack(fill="both", expand=True)
+    table_frame = QtWidgets.QWidget()
+    table_layout = QtWidgets.QVBoxLayout(table_frame)
+    table_layout.setContentsMargins(0, 0, 0, 0)
 
+    tree = QtWidgets.QTableWidget()
     columns = ("code", "name", "type", "city", "country", "capacity", "status")
-    tree = ttk.Treeview(table_frame, columns=columns, show="headings")
-
     column_map = {
         "code": ("Code", 80),
         "name": ("Name", 200),
@@ -66,21 +90,14 @@ def create_locations_tab(parent, current_user=None):
         "status": ("Status", 80),
     }
 
-    for col, (label_text, width) in column_map.items():
-        tree.heading(col, text=label_text.upper(), anchor="w")
-        tree.column(col, width=width, anchor="w")
+    tree.setColumnCount(len(columns))
+    tree.setHorizontalHeaderLabels([column_map[c][0].upper() for c in columns])
+    for i, col in enumerate(columns):
+        tree.horizontalHeader().resizeSection(i, column_map[col][1])
+    tree.horizontalHeader().setStretchLastSection(True)
 
-    scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tree.yview)
-    tree.configure(yscrollcommand=scrollbar.set)
-    scrollbar.pack(side="right", fill="y")
-    tree.pack(side="left", fill="both", expand=True)
-
-    try:
-        style = ttk.Style()
-        style.configure("Treeview", font=FONT_REGULAR, rowheight=28)
-        style.configure("Treeview.Heading", font=FONT_BOLD)
-    except Exception:
-        pass
+    table_layout.addWidget(tree)
+    main_layout.addWidget(table_frame, stretch=1)
 
     # ========================================================
     #  SINGLE SOURCE OF TRUTH: refresh_from_db()
@@ -88,7 +105,7 @@ def create_locations_tab(parent, current_user=None):
 
     def refresh_from_db(search_query=None):
         """Reload locations from the database."""
-        tree.delete(*tree.get_children())
+        tree.setRowCount(0)
         locations = svc.location.get_all_locations(active_only=True)
 
         if search_query:
@@ -99,31 +116,28 @@ def create_locations_tab(parent, current_user=None):
                          q in loc.get("city", "").lower()]
 
         for loc in locations:
-            tree.insert("", "end", values=(
-                loc.get("code", ""),
-                loc.get("name", ""),
-                loc.get("type", ""),
-                loc.get("city", ""),
-                loc.get("country", ""),
-                loc.get("capacity", ""),
-                "Active" if loc.get("is_active", 1) else "Inactive",
-            ), tags=("active",) if loc.get("is_active", 1) else ("inactive",))
-
-        tree.tag_configure("active", background=COLOR_APP_BG)
-        tree.tag_configure("inactive", background=COLOR_CARD_BG, foreground=COLOR_TEXT_MUTED)
+            row = tree.rowCount()
+            tree.insertRow(row)
+            tree.setItem(row, 0, QtWidgets.QTableWidgetItem(str(loc.get("code", ""))))
+            tree.setItem(row, 1, QtWidgets.QTableWidgetItem(str(loc.get("name", ""))))
+            tree.setItem(row, 2, QtWidgets.QTableWidgetItem(str(loc.get("type", ""))))
+            tree.setItem(row, 3, QtWidgets.QTableWidgetItem(str(loc.get("city", ""))))
+            tree.setItem(row, 4, QtWidgets.QTableWidgetItem(str(loc.get("country", ""))))
+            tree.setItem(row, 5, QtWidgets.QTableWidgetItem(str(loc.get("capacity", ""))))
+            status_item = QtWidgets.QTableWidgetItem("Active" if loc.get("is_active", 1) else "Inactive")
+            tree.setItem(row, 6, status_item)
 
     # Double-click to edit
-    def on_double_click(event):
-        sel = tree.selection()
-        if not sel:
+    def on_double_click(row, col):
+        code = tree.item(row, 0).text() if tree.item(row, 0) else ""
+        if not code:
             return
-        code = tree.item(sel[0], "values")[0]
         locations = svc.location.get_all_locations()
         loc = next((l for l in locations if l.get("code") == code), None)
         if loc:
             _open_location_dialog(window, current_user=current_user, mode="edit", existing_data=loc)
 
-    tree.bind("<Double-1>", on_double_click)
+    tree.cellDoubleClicked.connect(on_double_click)
 
     # Initial load
     refresh_from_db()
@@ -132,15 +146,19 @@ def create_locations_tab(parent, current_user=None):
 
 def _open_location_dialog(master, current_user=None, mode="add", existing_data=None):
     """Open dialog to add/edit a location."""
-    dlg = tk.Toplevel(master)
+    dlg = QtWidgets.QDialog(master)
     title = "Edit Location" if mode == "edit" else "Add Location"
-    dlg.title(title)
-    dlg.geometry("500x450")
-    dlg.transient(master)
-    dlg.grab_set()
+    dlg.setWindowTitle(title)
+    dlg.resize(500, 450)
+    dlg.setModal(True)
 
-    form_card = make_card(dlg, padx=20, pady=20)
-    form_card.pack(fill="both", expand=True, padx=10, pady=10)
+    main_layout = QtWidgets.QVBoxLayout(dlg)
+    main_layout.setContentsMargins(10, 10, 10, 10)
+
+    form_card = QtWidgets.QWidget()
+    form_layout = QtWidgets.QFormLayout(form_card)
+    form_layout.setContentsMargins(20, 20, 20, 20)
+    main_layout.addWidget(form_card)
 
     fields = [
         ("code", "Code", existing_data.get("code", "") if existing_data else ""),
@@ -155,23 +173,32 @@ def _open_location_dialog(master, current_user=None, mode="add", existing_data=N
     ]
 
     widgets = {}
-    for i, (key, lbl_text, default) in enumerate(fields):
-        label(form_card, lbl_text, kind="bold").grid(row=i, column=0, sticky="w", pady=5, padx=5)
+    for key, lbl_text, default in fields:
         if key == "type":
-            var = tk.StringVar(value=default)
-            w = combobox(form_card, values=["warehouse", "store", "office"], textvariable=var, state="readonly")
-            widgets[key] = var
+            w = QtWidgets.QComboBox()
+            w.addItems(["warehouse", "store", "office"])
+            w.setCurrentText(default)
+            form_layout.addRow(lbl_text, w)
+            widgets[key] = w
         else:
-            var = tk.StringVar(value=default)
-            w = entry(form_card, textvariable=var)
-            widgets[key] = var
-        w.grid(row=i, column=1, sticky="ew", pady=5, padx=5)
+            w = QtWidgets.QLineEdit()
+            w.setText(default)
+            form_layout.addRow(lbl_text, w)
+            widgets[key] = w
 
-    btn_frame = ttk.Frame(dlg)
-    btn_frame.pack(fill="x", pady=10, padx=10)
+    btn_frame = QtWidgets.QWidget()
+    btn_layout = QtWidgets.QHBoxLayout(btn_frame)
+    btn_layout.setContentsMargins(0, 0, 0, 0)
+    btn_layout.addStretch()
 
     def save():
-        data = {k: v.get() if hasattr(v, "get") else v for k, v in widgets.items()}
+        data = {}
+        for k, w in widgets.items():
+            if isinstance(w, QtWidgets.QComboBox):
+                data[k] = w.currentText()
+            else:
+                data[k] = w.text()
+
         # Convert capacity to int
         try:
             data["capacity"] = int(data.get("capacity", 0))
@@ -185,21 +212,31 @@ def _open_location_dialog(master, current_user=None, mode="add", existing_data=N
                 # Check duplicate code
                 existing = svc.location.get_all_locations()
                 if any(loc.get("code") == data["code"] for loc in existing):
-                    messagebox.showerror("Error", "Location code already exists")
+                    QtWidgets.QMessageBox.critical(dlg, "Error", "Location code already exists")
                     return
                 svc.location.add_location(data, username=username)
-                messagebox.showinfo("Success", "Location added successfully")
+                QtWidgets.QMessageBox.information(dlg, "Success", "Location added successfully")
             else:
                 code = existing_data.get("code")
                 update_data = {k: v for k, v in data.items() if k != "code"}
                 svc.location.update_location(code, update_data, username=username)
-                messagebox.showinfo("Success", "Location updated successfully")
-            dlg.destroy()
-            # Refresh the parent tab's tree — we call the outer refresh_from_db
-            # Since we're inside the same module, we can't directly call it.
-            # The dialog destroy will trigger a re-load by the caller pattern.
+                QtWidgets.QMessageBox.information(dlg, "Success", "Location updated successfully")
+            dlg.accept()
         except Exception as e:
-            messagebox.showerror("Error", str(e))
+            QtWidgets.QMessageBox.critical(dlg, "Error", str(e))
 
-    make_button(btn_frame, "Save", command=save, kind="primary").pack(side="right", padx=5)
-    make_button(btn_frame, "Cancel", command=dlg.destroy, kind="secondary").pack(side="right", padx=5)
+    save_btn = QtWidgets.QPushButton("Save")
+    save_btn.clicked.connect(save)
+    save_btn.setStyleSheet("background-color: #007bff; color: white; padding: 5px 15px; border-radius: 3px;")
+    btn_layout.addWidget(save_btn)
+
+    cancel_btn = QtWidgets.QPushButton("Cancel")
+    cancel_btn.clicked.connect(dlg.reject)
+    cancel_btn.setStyleSheet("padding: 5px 15px; border-radius: 3px;")
+    btn_layout.addWidget(cancel_btn)
+
+    main_layout.addWidget(btn_frame)
+
+    if dlg.exec() == QtWidgets.QDialog.Accepted:
+        # Refresh the parent - caller should handle this
+        pass

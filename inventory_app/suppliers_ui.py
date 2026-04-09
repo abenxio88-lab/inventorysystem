@@ -5,8 +5,7 @@ UI-ONLY layer. All data goes through the service layer.
 After every write, refresh_from_db() reloads fresh data.
 """
 
-import tkinter as tk
-from tkinter import ttk, messagebox
+from PySide6 import QtWidgets, QtCore, QtGui
 import logging
 
 from ui_theme import (
@@ -20,41 +19,66 @@ from app_core import app_state
 
 def create_suppliers_tab(parent, current_user=None):
     """Creates the suppliers management tab."""
-    window = ttk.Frame(parent, padding=15)
+    window = QtWidgets.QWidget()
+    window.setContentsMargins(15, 15, 15, 15)
+
+    main_layout = QtWidgets.QVBoxLayout(window)
+    main_layout.setContentsMargins(0, 0, 0, 0)
 
     # Header
-    header_frame = ttk.Frame(window)
-    header_frame.pack(fill="x", pady=(0, 15))
-    styled_label(header_frame, "🏭 Supplier Management", font=FONT_BOLD).pack(side=tk.LEFT)
+    header_frame = QtWidgets.QWidget()
+    header_layout = QtWidgets.QHBoxLayout(header_frame)
+    header_layout.setContentsMargins(0, 0, 0, 0)
+
+    header_label = QtWidgets.QLabel("Supplier Management")
+    header_label.setFont(FONT_BOLD)
+    header_layout.addWidget(header_label)
+    header_layout.addStretch()
 
     def open_add_supplier():
         _open_supplier_dialog(window, current_user=current_user, mode="add")
 
-    make_button(header_frame, "➕ Add Supplier", command=open_add_supplier, kind="success").pack(side=tk.RIGHT)
+    add_btn = QtWidgets.QPushButton("Add Supplier")
+    add_btn.clicked.connect(open_add_supplier)
+    add_btn.setStyleSheet("background-color: #28a745; color: white; padding: 5px 15px; border-radius: 3px;")
+    header_layout.addWidget(add_btn)
+
+    main_layout.addWidget(header_frame)
 
     # Search
-    toolbar = ttk.Frame(window)
-    toolbar.pack(fill="x", pady=(0, 10))
-    styled_label(toolbar, "Search:").pack(side=tk.LEFT, padx=(0, 10))
-    search_var = tk.StringVar()
-    search_entry = entry(toolbar, textvariable=search_var)
-    search_entry.pack(side=tk.LEFT, expand=True, fill="x")
+    toolbar = QtWidgets.QWidget()
+    toolbar_layout = QtWidgets.QHBoxLayout(toolbar)
+    toolbar_layout.setContentsMargins(0, 0, 0, 0)
+
+    search_label = QtWidgets.QLabel("Search:")
+    toolbar_layout.addWidget(search_label)
+
+    search_entry = QtWidgets.QLineEdit()
+    toolbar_layout.addWidget(search_entry, stretch=1)
 
     def apply_search():
-        q = search_var.get().strip()
+        q = search_entry.text().strip()
         refresh_from_db(q if q else None)
 
-    make_button(toolbar, "Search", command=apply_search, kind="primary").pack(side=tk.LEFT, padx=10)
-    make_button(toolbar, "Clear", command=lambda: (search_var.set(""), refresh_from_db()),
-                kind="secondary").pack(side=tk.LEFT)
+    search_btn = QtWidgets.QPushButton("Search")
+    search_btn.clicked.connect(apply_search)
+    search_btn.setStyleSheet("background-color: #007bff; color: white; padding: 5px 15px; border-radius: 3px;")
+    toolbar_layout.addWidget(search_btn)
+
+    clear_btn = QtWidgets.QPushButton("Clear")
+    clear_btn.clicked.connect(lambda: (search_entry.clear(), refresh_from_db()))
+    clear_btn.setStyleSheet("padding: 5px 15px; border-radius: 3px;")
+    toolbar_layout.addWidget(clear_btn)
+
+    main_layout.addWidget(toolbar)
 
     # Table
-    table_frame = make_card(window, padx=10, pady=10)
-    table_frame.pack(fill="both", expand=True)
+    table_frame = QtWidgets.QWidget()
+    table_layout = QtWidgets.QVBoxLayout(table_frame)
+    table_layout.setContentsMargins(0, 0, 0, 0)
 
+    tree = QtWidgets.QTableWidget()
     columns = ("code", "name", "contact_person", "phone", "city", "rating", "lead_time", "status")
-    tree = ttk.Treeview(table_frame, columns=columns, show="headings")
-
     column_map = {
         "code": ("Code", 80),
         "name": ("Name", 180),
@@ -66,21 +90,14 @@ def create_suppliers_tab(parent, current_user=None):
         "status": ("Status", 70),
     }
 
-    for col, (label_text, width) in column_map.items():
-        tree.heading(col, text=label_text.upper(), anchor="w")
-        tree.column(col, width=width, anchor="w")
+    tree.setColumnCount(len(columns))
+    tree.setHorizontalHeaderLabels([column_map[c][0].upper() for c in columns])
+    for i, col in enumerate(columns):
+        tree.horizontalHeader().resizeSection(i, column_map[col][1])
+    tree.horizontalHeader().setStretchLastSection(True)
 
-    scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tree.yview)
-    tree.configure(yscrollcommand=scrollbar.set)
-    scrollbar.pack(side="right", fill="y")
-    tree.pack(side="left", fill="both", expand=True)
-
-    try:
-        style = ttk.Style()
-        style.configure("Treeview", font=FONT_REGULAR, rowheight=28)
-        style.configure("Treeview.Heading", font=FONT_BOLD)
-    except Exception:
-        pass
+    table_layout.addWidget(tree)
+    main_layout.addWidget(table_frame, stretch=1)
 
     # ========================================================
     #  SINGLE SOURCE OF TRUTH: refresh_from_db()
@@ -88,7 +105,7 @@ def create_suppliers_tab(parent, current_user=None):
 
     def refresh_from_db(search_query=None):
         """Reload suppliers from the database."""
-        tree.delete(*tree.get_children())
+        tree.setRowCount(0)
         suppliers = svc.supplier.get_all_suppliers(active_only=True)
 
         if search_query:
@@ -99,29 +116,28 @@ def create_suppliers_tab(parent, current_user=None):
                          q in s.get("contact_person", "").lower()]
 
         for s in suppliers:
-            tree.insert("", "end", values=(
-                s.get("code", ""),
-                s.get("name", ""),
-                s.get("contact_person", ""),
-                s.get("phone", ""),
-                s.get("city", ""),
-                s.get("rating", 5),
-                s.get("lead_time_days", 7),
-                "Active" if s.get("is_active", 1) else "Inactive",
-            ))
+            row = tree.rowCount()
+            tree.insertRow(row)
+            tree.setItem(row, 0, QtWidgets.QTableWidgetItem(str(s.get("code", ""))))
+            tree.setItem(row, 1, QtWidgets.QTableWidgetItem(str(s.get("name", ""))))
+            tree.setItem(row, 2, QtWidgets.QTableWidgetItem(str(s.get("contact_person", ""))))
+            tree.setItem(row, 3, QtWidgets.QTableWidgetItem(str(s.get("phone", ""))))
+            tree.setItem(row, 4, QtWidgets.QTableWidgetItem(str(s.get("city", ""))))
+            tree.setItem(row, 5, QtWidgets.QTableWidgetItem(str(s.get("rating", 5))))
+            tree.setItem(row, 6, QtWidgets.QTableWidgetItem(str(s.get("lead_time_days", 7))))
+            tree.setItem(row, 7, QtWidgets.QTableWidgetItem("Active" if s.get("is_active", 1) else "Inactive"))
 
     # Double-click to edit
-    def on_double_click(event):
-        sel = tree.selection()
-        if not sel:
+    def on_double_click(row, col):
+        code = tree.item(row, 0).text() if tree.item(row, 0) else ""
+        if not code:
             return
-        code = tree.item(sel[0], "values")[0]
         suppliers = svc.supplier.get_all_suppliers()
         supplier = next((s for s in suppliers if s.get("code") == code), None)
         if supplier:
             _open_supplier_dialog(window, current_user=current_user, mode="edit", existing_data=supplier)
 
-    tree.bind("<Double-1>", on_double_click)
+    tree.cellDoubleClicked.connect(on_double_click)
 
     # Initial load
     refresh_from_db()
@@ -130,13 +146,19 @@ def create_suppliers_tab(parent, current_user=None):
 
 def _open_supplier_dialog(master, current_user=None, mode="add", existing_data=None):
     """Open dialog to add/edit a supplier."""
-    from app_core import PremiumPopup
+    dlg = QtWidgets.QDialog(master)
     title = "Edit Supplier" if mode == "edit" else "Add Supplier"
-    dlg = PremiumPopup(master, title, width=650, height=550, resizable=True)
-    content = dlg.get_content_frame()
+    dlg.setWindowTitle(title)
+    dlg.resize(650, 550)
+    dlg.setModal(True)
 
-    form_card = make_card(content, padx=20, pady=20)
-    form_card.pack(fill="both", expand=True, padx=10, pady=10)
+    main_layout = QtWidgets.QVBoxLayout(dlg)
+    main_layout.setContentsMargins(10, 10, 10, 10)
+
+    form_card = QtWidgets.QWidget()
+    form_layout = QtWidgets.QFormLayout(form_card)
+    form_layout.setContentsMargins(20, 20, 20, 20)
+    main_layout.addWidget(form_card)
 
     fields = [
         ("code", "Code", existing_data.get("code", "") if existing_data else ""),
@@ -156,17 +178,19 @@ def _open_supplier_dialog(master, current_user=None, mode="add", existing_data=N
     ]
 
     widgets = {}
-    for i, (key, lbl_text, default) in enumerate(fields):
-        row = i // 2
-        col = (i % 2) * 2
-        label(form_card, lbl_text, kind="bold").grid(row=row, column=col, sticky="w", pady=3, padx=5)
-        var = tk.StringVar(value=default)
-        w = entry(form_card, textvariable=var)
-        w.grid(row=row, column=col + 1, sticky="ew", pady=3, padx=5)
-        widgets[key] = var
+    for key, lbl_text, default in fields:
+        w = QtWidgets.QLineEdit()
+        w.setText(default)
+        form_layout.addRow(lbl_text, w)
+        widgets[key] = w
+
+    btn_frame = QtWidgets.QWidget()
+    btn_layout = QtWidgets.QHBoxLayout(btn_frame)
+    btn_layout.setContentsMargins(0, 0, 0, 0)
+    btn_layout.addStretch()
 
     def save():
-        data = {k: v.get() for k, v in widgets.items()}
+        data = {k: v.text() for k, v in widgets.items()}
         try:
             data["lead_time_days"] = int(data.get("lead_time_days", 7))
             data["rating"] = int(data.get("rating", 5))
@@ -179,20 +203,30 @@ def _open_supplier_dialog(master, current_user=None, mode="add", existing_data=N
             if mode == "add":
                 existing = svc.supplier.get_all_suppliers()
                 if any(s.get("code") == data["code"] for s in existing):
-                    messagebox.showerror("Error", "Supplier code already exists")
+                    QtWidgets.QMessageBox.critical(dlg, "Error", "Supplier code already exists")
                     return
                 svc.supplier.add_supplier(data, username=username)
-                messagebox.showinfo("Success", "Supplier added successfully")
+                QtWidgets.QMessageBox.information(dlg, "Success", "Supplier added successfully")
             else:
                 code = existing_data.get("code")
                 update_data = {k: v for k, v in data.items() if k != "code"}
                 svc.supplier.update_supplier(code, update_data, username=username)
-                messagebox.showinfo("Success", "Supplier updated successfully")
-            dlg.destroy()
+                QtWidgets.QMessageBox.information(dlg, "Success", "Supplier updated successfully")
+            dlg.accept()
         except Exception as e:
-            messagebox.showerror("Error", str(e))
+            QtWidgets.QMessageBox.critical(dlg, "Error", str(e))
 
-    dlg.add_button_bar([
-        {"text": "Save", "command": save, "style": "Accent.TButton"},
-        {"text": "Cancel", "command": dlg.destroy, "style": "TButton"}
-    ])
+    save_btn = QtWidgets.QPushButton("Save")
+    save_btn.clicked.connect(save)
+    save_btn.setStyleSheet("background-color: #007bff; color: white; padding: 5px 15px; border-radius: 3px;")
+    btn_layout.addWidget(save_btn)
+
+    cancel_btn = QtWidgets.QPushButton("Cancel")
+    cancel_btn.clicked.connect(dlg.reject)
+    cancel_btn.setStyleSheet("padding: 5px 15px; border-radius: 3px;")
+    btn_layout.addWidget(cancel_btn)
+
+    main_layout.addWidget(btn_frame)
+
+    if dlg.exec() == QtWidgets.QDialog.Accepted:
+        pass

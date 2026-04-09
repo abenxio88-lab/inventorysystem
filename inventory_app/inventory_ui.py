@@ -3,7 +3,7 @@ Inventory UI Tab
 ================
 UI-ONLY layer. Reads data through the service layer.
 After every write (add/update/delete) it calls refresh_from_db()
-so the tree view always reflects the true database state.
+so the table view always reflects the true database state.
 
 RULES:
   - No SQL queries here.
@@ -12,8 +12,7 @@ RULES:
   - All data writes go through svc.inventory
 """
 
-import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+from PySide6 import QtWidgets, QtCore, QtGui
 import os
 import csv
 import logging
@@ -37,29 +36,69 @@ from unified_data_entry import DynamicFormBuilder
 from error_manager import report_info, report_error
 
 
+def _show_info(parent, title, text):
+    QtWidgets.QMessageBox.information(parent, title, text)
+
+
+def _show_warning(parent, title, text):
+    QtWidgets.QMessageBox.warning(parent, title, text)
+
+
+def _show_error(parent, title, text):
+    QtWidgets.QMessageBox.critical(parent, title, text)
+
+
+def _ask_yes_no(parent, title, text):
+    return QtWidgets.QMessageBox.question(parent, title, text,
+                                           QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No) == QtWidgets.QMessageBox.Yes
+
+
+def _ask_yes_no_cancel(parent, title, text):
+    return QtWidgets.QMessageBox.question(parent, title, text,
+                                           QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No | QtWidgets.QMessageBox.Cancel)
+
+
 def create_inventory_tab(parent, current_user="Unknown"):
     """Creates the premium inventory management tab."""
-    window = ttk.Frame(parent, padding=15)
+    window = QtWidgets.QWidget()
+    main_layout = QtWidgets.QVBoxLayout(window)
+    main_layout.setContentsMargins(15, 15, 15, 15)
+    main_layout.setSpacing(10)
 
     # ── Header ────────────────────────────────────────────
-    header = frame(window, padding=20)
-    header.pack(fill="x", pady=(0, 20))
+    header = QtWidgets.QWidget()
+    header_layout = QtWidgets.QHBoxLayout(header)
+    header_layout.setContentsMargins(20, 20, 20, 20)
 
-    label(header, "📦 STOCK MANAGEMENT", kind="heading").pack(side="left")
+    heading_label = QtWidgets.QLabel("📦 STOCK MANAGEMENT")
+    heading_label.setStyleSheet(f"font-size: {FONT_HEADING}; font-weight: bold;")
+    header_layout.addWidget(heading_label)
 
-    total_var = tk.StringVar(value="Total Stock Items: 0")
-    total_lbl = label(header, total_var.get(), kind="bold", foreground=COLOR_PRIMARY)
-    total_lbl.pack(side="right")
+    header_layout.addStretch()
+
+    total_lbl = QtWidgets.QLabel("Total Stock Items: 0")
+    total_lbl.setStyleSheet(f"font-weight: bold; color: {COLOR_PRIMARY};")
+    header_layout.addWidget(total_lbl)
+
+    main_layout.addWidget(header)
 
     # ── Layout ────────────────────────────────────────────
-    paned = ttk.PanedWindow(window, orient="horizontal")
-    paned.pack(fill="both", expand=True)
+    paned_splitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
+    main_layout.addWidget(paned_splitter)
 
-    left_frame = frame(paned, padding=20)
-    paned.add(left_frame, weight=1)
+    left_frame = QtWidgets.QWidget()
+    left_layout = QtWidgets.QVBoxLayout(left_frame)
+    left_layout.setContentsMargins(20, 20, 20, 20)
+    left_layout.setSpacing(10)
+    paned_splitter.addWidget(left_frame)
 
-    right_frame = frame(paned, padding=20)
-    paned.add(right_frame, weight=3)
+    right_frame = QtWidgets.QWidget()
+    right_layout = QtWidgets.QVBoxLayout(right_frame)
+    right_layout.setContentsMargins(20, 20, 20, 20)
+    right_layout.setSpacing(10)
+    paned_splitter.addWidget(right_frame)
+
+    paned_splitter.setSizes([1, 3])
 
     # ── undo stack (local to this tab) ────────────────────
     undo_stack = []
@@ -68,18 +107,19 @@ def create_inventory_tab(parent, current_user="Unknown"):
     #  SINGLE SOURCE OF TRUTH: refresh_from_db()
     #  Every UI refresh reads fresh data through the service.
     # ========================================================
+    # We store tree reference in a closure container
+    tree_container = {"tree": None}
 
     def refresh_from_db(filtered_data=None):
-        """Reload the tree view and stats from the database."""
+        """Reload the table view and stats from the database."""
         _update_total()
-        _populate_tree(filtered_data)
+        _populate_table(filtered_data)
         _refresh_model_dropdown()
 
     def _update_total():
         stats = get_db_stats()
         total = stats.get("total_products", 0)
-        total_var.set(f"Total Stock Items: {total:,}")
-        total_lbl.configure(text=total_var.get())
+        total_lbl.setText(f"Total Stock Items: {total:,}")
 
     def _resolve_category_display(item):
         """Return human-friendly category text for tree/form."""
@@ -102,20 +142,21 @@ def create_inventory_tab(parent, current_user="Unknown"):
         """
         return svc.inventory.parse_related_id(field_name, raw_value)
 
-    def _populate_tree(items=None):
-        """Fill the treeview — dynamically matches tree columns from DB data."""
-        tree.delete(*tree.get_children())
+    def _populate_table(items=None):
+        """Fill the table — dynamically matches table columns from DB data."""
+        tree = tree_container["tree"]
+        if tree is None:
+            return
+
+        tree.setRowCount(0)
 
         if items is None:
             items = svc.inventory.get_all_products(active_only=True)
 
-        actual_columns = tree["columns"]
+        actual_columns = tree_container.get("columns", [])
 
         for i, item in enumerate(items):
             stock_val = int(item.get("stock", 0))
-            tags = ("even",) if i % 2 else ("odd",)
-            if stock_val <= 5:
-                tags = ("low",)
 
             values = []
             for col in actual_columns:
@@ -129,13 +170,23 @@ def create_inventory_tab(parent, current_user="Unknown"):
                     val = float(raw) if raw else 0
                     values.append(f'{val:,}')
                 elif col == "stock":
-                    values.append(stock_val)
+                    values.append(str(stock_val))
                 elif col == "expiry_date":
                     values.append(str(raw)[:10] if raw else "-")
                 else:
-                    values.append(raw if raw else "-")
+                    values.append(str(raw) if raw else "-")
 
-            tree.insert("", "end", values=values, tags=tags)
+            tree.insertRow(i)
+            for j, val in enumerate(values):
+                tree.setItem(i, j, QtWidgets.QTableWidgetItem(val))
+
+            # Color low stock rows
+            if stock_val <= 5:
+                for j in range(len(values)):
+                    cell_item = tree.item(i, j)
+                    if cell_item:
+                        cell_item.setBackground(QtGui.QColor("#FEF2F2"))
+                        cell_item.setForeground(QtGui.QColor("#DC2626"))
 
     def _refresh_model_dropdown():
         """Update the model dropdown with current product models."""
@@ -144,10 +195,9 @@ def create_inventory_tab(parent, current_user="Unknown"):
         if "form" in globals() and "model" in form.widgets:
             widget = form.widgets["model"]
             try:
-                if hasattr(widget, "configure"):
-                    widget.configure(values=models)
-                elif hasattr(widget, "config"):
-                    widget.config(values=models)
+                if isinstance(widget, QtWidgets.QComboBox):
+                    widget.clear()
+                    widget.addItems(models)
             except Exception:
                 pass
 
@@ -166,9 +216,14 @@ def create_inventory_tab(parent, current_user="Unknown"):
     # ========================================================
     from migration_add_industry_type import get_industry_type
 
-    label(left_frame, "PRODUCT INFORMATION", kind="heading").pack(anchor="w", pady=(0, 10))
-    form_card = make_card(left_frame, padx=20, pady=20)
-    form_card.pack(fill="x", pady=(0, 15))
+    form_heading = QtWidgets.QLabel("PRODUCT INFORMATION")
+    form_heading.setStyleSheet(f"font-size: {FONT_HEADING}; font-weight: bold;")
+    left_layout.addWidget(form_heading)
+
+    form_card = QtWidgets.QWidget()
+    form_card_layout = QtWidgets.QVBoxLayout(form_card)
+    form_card_layout.setContentsMargins(20, 20, 20, 20)
+    left_layout.addWidget(form_card)
 
     form = DynamicFormBuilder(form_card, get_industry_type(), "products")
     form.build_form()
@@ -176,10 +231,12 @@ def create_inventory_tab(parent, current_user="Unknown"):
     def clear_form():
         for widget in form.widgets.values():
             try:
-                if hasattr(widget, "delete"):
-                    widget.delete(0, tk.END)
-                if hasattr(widget, "set"):
-                    widget.set("")
+                if isinstance(widget, QtWidgets.QLineEdit):
+                    widget.clear()
+                elif isinstance(widget, QtWidgets.QComboBox):
+                    widget.setCurrentIndex(-1)
+                elif isinstance(widget, QtWidgets.QTextEdit):
+                    widget.clear()
             except Exception:
                 pass
 
@@ -190,25 +247,25 @@ def create_inventory_tab(parent, current_user="Unknown"):
     def add_item():
         """Add a new product through the service layer."""
         values = form.get_values()
-        
+
         # Normalize category_id/supplier_id to integer IDs
         for field in ('category_id', 'supplier_id'):
             try:
                 values[field] = _parse_related_id(field, values.get(field, ""))
             except ValueError as e:
-                messagebox.showerror("Invalid Selection", str(e))
+                _show_error(window, "Invalid Selection", str(e))
                 return
-        
+
         model = values.get("model", "").strip()
         if not model:
-            messagebox.showerror("Error", "Model name required")
+            _show_error(window, "Error", "Model name required")
             return
 
         try:
             # Check duplicate
             existing = svc.inventory.get_product_by_model(model)
             if existing:
-                messagebox.showerror("Error", "Model already exists — use Update")
+                _show_error(window, "Error", "Model already exists — use Update")
                 return
 
             svc.inventory.add_product(values, username=current_user)
@@ -217,29 +274,29 @@ def create_inventory_tab(parent, current_user="Unknown"):
             clear_form()
         except Exception as e:
             report_error("Failed to add inventory item", exception=e, module="Inventory")
-            messagebox.showerror("Operation Failed", str(e))
+            _show_error(window, "Operation Failed", str(e))
 
     def update_item():
         """Update an existing product through the service layer."""
         values = form.get_values()
-        
+
         # Normalize category_id/supplier_id to integer IDs
         for field in ('category_id', 'supplier_id'):
             try:
                 values[field] = _parse_related_id(field, values.get(field, ""))
             except ValueError as e:
-                messagebox.showerror("Invalid Selection", str(e))
+                _show_error(window, "Invalid Selection", str(e))
                 return
-        
+
         model = values.get("model", "").strip()
         if not model:
-            messagebox.showerror("Error", "Model name required")
+            _show_error(window, "Error", "Model name required")
             return
 
         try:
             existing = svc.inventory.get_product_by_model(model)
             if not existing:
-                messagebox.showerror("Error", "Model not found — use Add to create new model")
+                _show_error(window, "Error", "Model not found — use Add to create new model")
                 return
 
             svc.inventory.update_product(model, values, username=current_user)
@@ -248,21 +305,27 @@ def create_inventory_tab(parent, current_user="Unknown"):
             clear_form()
         except Exception as e:
             report_error("Failed to update inventory item", exception=e, module="Inventory")
-            messagebox.showerror("Operation Failed", str(e))
+            _show_error(window, "Operation Failed", str(e))
 
     def delete_item():
         """Delete a product through the service layer."""
-        sel = tree.selection()
-        if not sel:
-            messagebox.showerror("Error", "Select item to delete")
+        tree = tree_container["tree"]
+        if tree is None:
+            return
+        sel = tree.currentRow()
+        if sel < 0:
+            _show_error(window, "Error", "Select item to delete")
             return
 
         if not _is_admin():
-            messagebox.showerror("Permission Denied", "Only admins can delete items")
+            _show_error(window, "Permission Denied", "Only admins can delete items")
             return
 
-        model = tree.item(sel[0], "values")[0]
-        if not messagebox.askyesno("Confirm", f"Delete {model}?"):
+        model_item = tree.item(sel, 0)
+        if model_item is None:
+            return
+        model = model_item.text()
+        if not _ask_yes_no(window, "Confirm", f"Delete {model}?"):
             return
 
         try:
@@ -272,11 +335,11 @@ def create_inventory_tab(parent, current_user="Unknown"):
             clear_form()
         except Exception as e:
             report_error("Failed to delete inventory item", exception=e, module="Inventory")
-            messagebox.showerror("Operation Failed", str(e))
+            _show_error(window, "Operation Failed", str(e))
 
     def undo_action():
         if not undo_stack:
-            messagebox.showinfo("Undo", "Nothing to undo")
+            _show_info(window, "Undo", "Nothing to undo")
             return
         prev = undo_stack.pop()
         try:
@@ -286,39 +349,55 @@ def create_inventory_tab(parent, current_user="Unknown"):
             logging.info("Undo applied")
         except Exception:
             logging.error("Failed to undo", exc_info=True)
-            messagebox.showerror("Error", "Failed to undo")
+            _show_error(window, "Error", "Failed to undo")
 
     # ── Action buttons ────────────────────────────────────
-    btn_frame = ttk.Frame(left_frame)
-    btn_frame.pack(fill="x", pady=10)
+    btn_frame = QtWidgets.QWidget()
+    btn_frame_layout = QtWidgets.QHBoxLayout(btn_frame)
+    btn_frame_layout.setContentsMargins(0, 0, 0, 0)
+    left_layout.addWidget(btn_frame)
 
-    make_button(btn_frame, "Add Item", command=add_item, kind="success").pack(
-        side="left", expand=True, fill="x", padx=(0, 5))
-    make_button(btn_frame, "Update Item", command=update_item, kind="primary").pack(
-        side="left", expand=True, fill="x", padx=(0, 5))
-    make_button(btn_frame, "Delete Item", command=delete_item, kind="danger").pack(
-        side="left", expand=True, fill="x")
+    btn_add = QtWidgets.QPushButton("Add Item")
+    btn_add.clicked.connect(add_item)
+    btn_frame_layout.addWidget(btn_add)
 
-    btn_frame_2 = ttk.Frame(left_frame)
-    btn_frame_2.pack(fill="x", pady=(5, 10))
-    make_button(btn_frame_2, "Undo", command=undo_action, kind="warning").pack(
-        side="left", expand=True, fill="x", padx=(0, 5))
-    make_button(btn_frame_2, "Clear Form", command=clear_form, kind="secondary").pack(
-        side="left", expand=True, fill="x")
+    btn_update = QtWidgets.QPushButton("Update Item")
+    btn_update.clicked.connect(update_item)
+    btn_frame_layout.addWidget(btn_update)
+
+    btn_delete = QtWidgets.QPushButton("Delete Item")
+    btn_delete.clicked.connect(delete_item)
+    btn_frame_layout.addWidget(btn_delete)
+
+    btn_frame_2 = QtWidgets.QWidget()
+    btn_frame_2_layout = QtWidgets.QHBoxLayout(btn_frame_2)
+    btn_frame_2_layout.setContentsMargins(0, 0, 0, 0)
+    left_layout.addWidget(btn_frame_2)
+
+    btn_undo = QtWidgets.QPushButton("Undo")
+    btn_undo.clicked.connect(undo_action)
+    btn_frame_2_layout.addWidget(btn_undo)
+
+    btn_clear = QtWidgets.QPushButton("Clear Form")
+    btn_clear.clicked.connect(clear_form)
+    btn_frame_2_layout.addWidget(btn_clear)
 
     # ========================================================
     #  TOOLBAR / SEARCH
     # ========================================================
-    toolbar = ttk.Frame(right_frame, padding=(0, 6))
-    toolbar.pack(fill="x", pady=(0, 12))
+    toolbar = QtWidgets.QWidget()
+    toolbar_layout = QtWidgets.QHBoxLayout(toolbar)
+    toolbar_layout.setContentsMargins(0, 6, 0, 6)
+    right_layout.addWidget(toolbar)
 
-    styled_label(toolbar, "Search:").pack(side="left", padx=(0, 10))
-    search_var = tk.StringVar()
-    search_entry = styled_entry(toolbar, textvariable=search_var)
-    search_entry.pack(side="left", expand=True, fill="x")
+    search_label = QtWidgets.QLabel("Search:")
+    toolbar_layout.addWidget(search_label)
 
-    def apply_search(event=None):
-        q = search_var.get().strip().lower()
+    search_entry = QtWidgets.QLineEdit()
+    toolbar_layout.addWidget(search_entry, stretch=1)
+
+    def apply_search():
+        q = search_entry.text().strip().lower()
         if not q:
             refresh_from_db()
             return
@@ -326,53 +405,71 @@ def create_inventory_tab(parent, current_user="Unknown"):
         results = [it for it in all_items if q in " ".join(str(v) for v in it.values()).lower()]
         refresh_from_db(filtered_data=results)
 
-    make_button(toolbar, "Search", command=apply_search, kind="primary").pack(side="left", padx=10)
-    make_button(toolbar, "Clear", command=lambda: (search_var.set(""), refresh_from_db()),
-                kind="secondary").pack(side="left")
+    search_entry.textChanged.connect(apply_search)
+
+    btn_search = QtWidgets.QPushButton("Search")
+    btn_search.clicked.connect(apply_search)
+    toolbar_layout.addWidget(btn_search)
+
+    btn_clear_search = QtWidgets.QPushButton("Clear")
+    btn_clear_search.clicked.connect(lambda: (search_entry.clear(), refresh_from_db()))
+    toolbar_layout.addWidget(btn_clear_search)
 
     # ── Extra toolbar buttons ─────────────────────────────
     def on_export_csv():
-        fname = filedialog.asksaveasfilename(
-            defaultextension=".csv",
-            filetypes=[("CSV files", "*.csv")],
-            initialfile=f"inventory_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+        fname, _ = QtWidgets.QFileDialog.getSaveFileName(
+            window,
+            "Export CSV",
+            f"inventory_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            "CSV files (*.csv)"
         )
         if not fname:
             return
         try:
             _export_to_csv(fname)
-            messagebox.showinfo("Export", f"Exported inventory to: {fname}")
+            _show_info(window, "Export", f"Exported inventory to: {fname}")
         except Exception:
             logging.exception("Export failed")
-            messagebox.showerror("Export Failed", "Failed to export inventory to CSV")
+            _show_error(window, "Export Failed", "Failed to export inventory to CSV")
 
     def on_import_csv():
-        fname = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv")])
+        fname, _ = QtWidgets.QFileDialog.getOpenFileName(
+            window,
+            "Import CSV",
+            "",
+            "CSV files (*.csv)"
+        )
         if not fname:
             return
         if not _is_admin():
-            messagebox.showerror("Permission Denied", "Only admins can import inventory")
+            _show_error(window, "Permission Denied", "Only admins can import inventory")
             return
         _preview_and_import_csv(fname)
 
     def on_backup():
         if not _is_admin():
-            messagebox.showerror("Permission Denied", "Only admins can run backups")
+            _show_error(window, "Permission Denied", "Only admins can run backups")
             return
         try:
             from backup_manager import backup_data
             dest = backup_data()
-            messagebox.showinfo("Backup", f"Data backed up to: {dest}")
+            _show_info(window, "Backup", f"Data backed up to: {dest}")
         except Exception:
             logging.exception("Backup failed")
-            messagebox.showerror("Backup Failed", "Failed to backup data")
+            _show_error(window, "Backup Failed", "Failed to backup data")
 
     def on_generate_qr():
-        sel = tree.selection()
-        if not sel:
-            messagebox.showerror("Error", "Select item to generate QR")
+        tree = tree_container["tree"]
+        if tree is None:
             return
-        model = tree.item(sel[0], "values")[0]
+        sel = tree.currentRow()
+        if sel < 0:
+            _show_error(window, "Error", "Select item to generate QR")
+            return
+        model_item = tree.item(sel, 0)
+        if model_item is None:
+            return
+        model = model_item.text()
         item = svc.inventory.get_product_by_model(model)
         if item:
             try:
@@ -381,30 +478,51 @@ def create_inventory_tab(parent, current_user="Unknown"):
                 from barcode_system import generate_product_barcode
                 path = generate_product_barcode(item)
                 if path:
-                    messagebox.showinfo("Success", f"QR/Barcode generated at:\n{path}")
+                    _show_info(window, "Success", f"QR/Barcode generated at:\n{path}")
                     os.startfile(os.path.dirname(path))
             except Exception as e:
                 logging.exception("QR generation failed")
-                messagebox.showerror("Error", f"Failed to generate QR: {e}")
+                _show_error(window, "Error", f"Failed to generate QR: {e}")
 
-    make_button(toolbar, "Export CSV", command=on_export_csv, kind="secondary").pack(side="left", padx=(10, 0))
-    make_button(toolbar, "Import CSV", command=on_import_csv, kind="secondary").pack(side="left", padx=(5, 0))
-    make_button(toolbar, "Backup", command=on_backup, kind="secondary").pack(side="left", padx=(5, 0))
-    make_button(toolbar, "Generate QR", command=on_generate_qr, kind="success").pack(side="left", padx=(5, 0))
+    btn_export = QtWidgets.QPushButton("Export CSV")
+    btn_export.clicked.connect(on_export_csv)
+    toolbar_layout.addWidget(btn_export)
+
+    btn_import = QtWidgets.QPushButton("Import CSV")
+    btn_import.clicked.connect(on_import_csv)
+    toolbar_layout.addWidget(btn_import)
+
+    btn_backup = QtWidgets.QPushButton("Backup")
+    btn_backup.clicked.connect(on_backup)
+    toolbar_layout.addWidget(btn_backup)
+
+    btn_qr = QtWidgets.QPushButton("Generate QR")
+    btn_qr.clicked.connect(on_generate_qr)
+    toolbar_layout.addWidget(btn_qr)
+
+    toolbar_layout.addStretch()
 
     state = {"full": False}
     def toggle_fullscreen():
         state["full"] = not state["full"]
-        top_level = window.winfo_toplevel()
-        top_level.attributes("-fullscreen", state["full"])
+        top_level = window.window()
+        if isinstance(top_level, QtWidgets.QMainWindow):
+            if state["full"]:
+                top_level.showFullScreen()
+            else:
+                top_level.showNormal()
 
-    make_button(toolbar, "⛶", command=toggle_fullscreen, kind="secondary").pack(side="right")
+    btn_fullscreen = QtWidgets.QPushButton("⛶")
+    btn_fullscreen.clicked.connect(toggle_fullscreen)
+    toolbar_layout.addWidget(btn_fullscreen)
 
     # ========================================================
-    #  TREE VIEW — columns built 100% from form field configs
+    #  TABLE VIEW — columns built 100% from form field configs
     # ========================================================
-    table_frame = make_card(right_frame, padx=10, pady=10)
-    table_frame.pack(fill="both", expand=True)
+    table_frame = QtWidgets.QWidget()
+    table_frame_layout = QtWidgets.QVBoxLayout(table_frame)
+    table_frame_layout.setContentsMargins(10, 10, 10, 10)
+    right_layout.addWidget(table_frame, stretch=1)
 
     from migration_add_industry_type import get_industry_type
     from unified_data_entry import IndustryConfig
@@ -418,7 +536,7 @@ def create_inventory_tab(parent, current_user="Unknown"):
         _labels[fc["name"]] = fc["label"]
 
     # Build column map directly from field configs — EXACT same fields as form
-    # Show ALL form fields in the tree
+    # Show ALL form fields in the table
     column_map = {}
     for fc in field_configs:
         name = fc["name"]
@@ -426,40 +544,35 @@ def create_inventory_tab(parent, current_user="Unknown"):
         column_map[name] = (label_text, 100)
 
     columns = list(column_map.keys())
-    tree = ttk.Treeview(table_frame, columns=columns, show="headings")
+    tree_container["columns"] = columns
 
-    for col, (label_text, width) in column_map.items():
-        tree.heading(col, text=label_text.upper(), anchor="center")
-        tree.column(col, width=width, anchor="center")
+    tree = QtWidgets.QTableWidget()
+    tree.setColumnCount(len(columns))
+    tree.setHorizontalHeaderLabels([label_text.upper() for label_text, _ in column_map.values()])
+    tree.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+    tree.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+    tree.setAlternatingRowColors(True)
+    tree.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
 
-    scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tree.yview)
-    tree.configure(yscrollcommand=scrollbar.set)
-    scrollbar.pack(side="right", fill="y")
-    tree.pack(side="left", fill="both", expand=True)
+    for i, (col, (label_text, width)) in enumerate(column_map.items()):
+        tree.setColumnWidth(i, width)
 
-    palette = get_palette()
-    tree.tag_configure("low", background="#FEF2F2", foreground="#DC2626")
-    tree.tag_configure("odd", background=COLOR_CARD_BG, foreground=COLOR_TEXT_MAIN)
-    tree.tag_configure("even", background=COLOR_APP_BG, foreground=COLOR_TEXT_MAIN)
+    tree_container["tree"] = tree
+    table_frame_layout.addWidget(tree)
 
-    def on_tree_click(event):
-        row = tree.identify_row(event.y)
-        if row == "":
-            try:
-                sel = tree.selection()
-                if sel:
-                    tree.selection_remove(sel)
-            except Exception:
-                pass
-            clear_form()
-            return "break"
+    def on_table_cell_double_clicked(row, column):
+        pass  # Selection handles loading
 
-    def on_select(event=None):
-        sel = tree.selection()
-        if not sel:
+    tree.cellDoubleClicked.connect(on_table_cell_double_clicked)
+
+    def on_table_selection_changed(current, previous):
+        if current.row() < 0:
             clear_form()
             return
-        model_name = tree.item(sel[0], "values")[0]
+        model_item = tree.item(current.row(), 0)
+        if model_item is None:
+            return
+        model_name = model_item.text()
         item = svc.inventory.get_product_by_model(model_name)
         if not item:
             return
@@ -471,45 +584,51 @@ def create_inventory_tab(parent, current_user="Unknown"):
                 # For combobox widgets (category_id, supplier_id), show human text or fall back
                 if field_name == 'category_id':
                     display_text = _resolve_category_display(item)
-                    widget.set(display_text)
+                    if isinstance(widget, QtWidgets.QComboBox):
+                        idx = widget.findText(display_text)
+                        if idx >= 0:
+                            widget.setCurrentIndex(idx)
+                        else:
+                            widget.setEditText(display_text)
                 elif field_name == 'supplier_id':
                     display_text = _resolve_supplier_display(item)
-                    widget.set(display_text)
-                elif hasattr(widget, "delete"):
-                    widget.delete(0, tk.END)
-                    widget.insert(0, str(val))
-                elif hasattr(widget, "set"):
-                    widget.set(val)
+                    if isinstance(widget, QtWidgets.QComboBox):
+                        idx = widget.findText(display_text)
+                        if idx >= 0:
+                            widget.setCurrentIndex(idx)
+                        else:
+                            widget.setEditText(display_text)
+                elif isinstance(widget, QtWidgets.QLineEdit):
+                    widget.setText(str(val))
+                elif isinstance(widget, QtWidgets.QComboBox):
+                    idx = widget.findText(str(val))
+                    if idx >= 0:
+                        widget.setCurrentIndex(idx)
+                elif isinstance(widget, QtWidgets.QTextEdit):
+                    widget.setPlainText(str(val))
             except Exception:
                 pass
 
-    tree.bind("<Button-1>", on_tree_click)
-    tree.bind("<<TreeviewSelect>>", on_select)
-
-    try:
-        style.configure("Treeview", font=FONT_REGULAR, rowheight=28)
-        style.configure("Treeview.Heading", font=FONT_BOLD)
-    except Exception:
-        pass
+    tree.currentCellChanged.connect(on_table_selection_changed)
 
     # ── Initial load ──────────────────────────────────────
     refresh_from_db()
 
     # ── Key bindings ──────────────────────────────────────
-    def focus_next(event):
-        event.widget.tk_focusNext().focus()
-        return "break"
+    def focus_next_on_return():
+        window.focusNextChild()
 
-    search_entry.bind("<Return>", lambda e: apply_search())
+    search_entry.returnPressed.connect(focus_next_on_return)
 
     if "form" in globals():
         for name, w in form.widgets.items():
             try:
-                w.bind("<Return>", focus_next)
+                if isinstance(w, QtWidgets.QLineEdit):
+                    w.returnPressed.connect(focus_next_on_return)
             except Exception:
                 pass
 
-    window.focus_set()
+    window.setFocus()
     return window
 
 
@@ -560,32 +679,37 @@ def _preview_and_import_csv(filepath: str):
             else:
                 parsed.append(item)
 
-    pv = PremiumPopup(app_state.main_notebook.winfo_toplevel() if app_state.main_notebook else None, "Import Preview", width=900, height=500)
-    
-    content = pv.get_content_frame()
+    # Create a preview dialog
+    dialog = QtWidgets.QDialog()
+    dialog.setWindowTitle("Import Preview")
+    dialog.resize(900, 500)
+    dialog_layout = QtWidgets.QVBoxLayout(dialog)
 
-    label(content, f"Previewing {os.path.basename(filepath)} — {len(parsed)} valid, {len(invalid)} invalid",
-          kind="heading").pack(anchor="w", pady=6, padx=6)
+    preview_label = QtWidgets.QLabel(
+        f"Previewing {os.path.basename(filepath)} — {len(parsed)} valid, {len(invalid)} invalid"
+    )
+    preview_label.setStyleSheet(f"font-size: {FONT_HEADING}; font-weight: bold;")
+    dialog_layout.addWidget(preview_label)
 
-    treef = make_card(content, padx=6, pady=6)
-    treef.pack(fill="both", expand=True, padx=6, pady=(0, 6))
-
+    table_widget = QtWidgets.QTableWidget()
     cols = ("model", "category", "supplier", "purchase_price", "selling_price", "stock")
-    t = ttk.Treeview(treef, columns=cols, show="headings")
-    for c in cols:
-        t.heading(c, text=c)
-        t.column(c, width=120)
-    for it in parsed[:200]:
-        t.insert("", "end", values=(
-            it.get("model"), it.get("category"), it.get("supplier"),
-            it.get("purchase_price"), it.get("selling_price"), it.get("stock"),
-        ))
-    t.pack(fill="both", expand=True)
+    table_widget.setColumnCount(len(cols))
+    table_widget.setHorizontalHeaderLabels([c.upper() for c in cols])
+    table_widget.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+    table_widget.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+
+    for i, it in enumerate(parsed[:200]):
+        table_widget.insertRow(i)
+        for j, col_name in enumerate(cols):
+            val = it.get(col_name, "")
+            table_widget.setItem(i, j, QtWidgets.QTableWidgetItem(str(val)))
+
+    dialog_layout.addWidget(table_widget)
+
+    btn_layout = QtWidgets.QHBoxLayout()
 
     def proceed():
-        merge = messagebox.askyesno(
-            "Import", "Merge with existing inventory?\nYes = merge, No = replace", parent=pv
-        )
+        merge = _ask_yes_no_cancel(dialog, "Import", "Merge with existing inventory?\nYes = merge, No = replace") == QtWidgets.QMessageBox.Yes
         try:
             if merge:
                 # Merge: Only update products that don't exist, preserve existing
@@ -597,13 +721,20 @@ def _preview_and_import_csv(filepath: str):
                 # Replace: Upsert all products (overwrite existing)
                 for item in parsed:
                     svc.inventory.upsert_product(item, username=getattr(app_state, "username", "system"))
-            messagebox.showinfo("Import", "Inventory imported successfully", parent=pv)
+            _show_info(dialog, "Import", "Inventory imported successfully")
         except Exception:
             logging.exception("Import failed")
-            messagebox.showerror("Import Failed", "Failed to import inventory from CSV", parent=pv)
-        pv.destroy()
+            _show_error(dialog, "Import Failed", "Failed to import inventory from CSV")
+        dialog.accept()
 
-    pv.add_button_bar([
-        {"text": "Proceed with Import", "command": proceed, "style": "Accent.TButton"},
-        {"text": "Cancel", "command": pv.destroy, "style": "TButton"}
-    ])
+    btn_import = QtWidgets.QPushButton("Proceed with Import")
+    btn_import.clicked.connect(proceed)
+    btn_layout.addWidget(btn_import)
+
+    btn_cancel = QtWidgets.QPushButton("Cancel")
+    btn_cancel.clicked.connect(dialog.reject)
+    btn_layout.addWidget(btn_cancel)
+
+    dialog_layout.addLayout(btn_layout)
+
+    dialog.exec()

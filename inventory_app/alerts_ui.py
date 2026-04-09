@@ -4,8 +4,7 @@ Alerts UI Module
 User interface for viewing and managing alerts.
 """
 
-import tkinter as tk
-from tkinter import ttk, messagebox
+from PySide6 import QtWidgets, QtCore, QtGui
 import logging
 
 from ui_theme import make_card, styled_label, make_button, FONT_REGULAR, FONT_BOLD, COLOR_DANGER, COLOR_WARNING, COLOR_SUCCESS, COLOR_PRIMARY
@@ -16,47 +15,62 @@ def create_alerts_tab(parent, current_user=None):
     """
     Creates the alerts management tab.
     """
-    window = ttk.Frame(parent, padding=15)
-    
+    window = QtWidgets.QWidget()
+    window.setContentsMargins(15, 15, 15, 15)
+
+    main_layout = QtWidgets.QVBoxLayout(window)
+    main_layout.setContentsMargins(0, 0, 0, 0)
+
     # Header
-    header_frame = ttk.Frame(window)
-    header_frame.pack(fill="x", pady=(0, 15))
-    
-    styled_label(header_frame, "🔔 Alerts & Notifications", font=FONT_BOLD).pack(side=tk.LEFT)
-    
+    header_frame = QtWidgets.QWidget()
+    header_layout = QtWidgets.QHBoxLayout(header_frame)
+    header_layout.setContentsMargins(0, 0, 0, 0)
+
+    header_label = QtWidgets.QLabel("Alerts & Notifications")
+    header_label.setFont(FONT_BOLD)
+    header_layout.addWidget(header_label)
+    header_layout.addStretch()
+
     # Actions
-    actions_frame = ttk.Frame(header_frame)
-    actions_frame.pack(side=tk.RIGHT)
-    
-    def refresh_alerts():
-        window.refresh_alerts()
-    
-    make_button(actions_frame, "🔄 Refresh", command=refresh_alerts, kind="secondary").pack(side=tk.LEFT, padx=5)
-    make_button(actions_frame, "✅ Mark All Read", command=lambda: mark_all_read(window), kind="success").pack(side=tk.LEFT, padx=5)
-    
+    refresh_btn = QtWidgets.QPushButton("Refresh")
+    refresh_btn.clicked.connect(lambda: window.refresh_alerts())
+    refresh_btn.setStyleSheet("padding: 5px 15px; border-radius: 3px;")
+    header_layout.addWidget(refresh_btn)
+
+    mark_all_btn = QtWidgets.QPushButton("Mark All Read")
+    mark_all_btn.clicked.connect(lambda: mark_all_read(window))
+    mark_all_btn.setStyleSheet("background-color: #28a745; color: white; padding: 5px 15px; border-radius: 3px;")
+    header_layout.addWidget(mark_all_btn)
+
+    main_layout.addWidget(header_frame)
+
     # Summary cards
-    summary_frame = ttk.Frame(window)
-    summary_frame.pack(fill="x", pady=(0, 15))
-    summary_frame.grid_columnconfigure((0, 1, 2, 3), weight=1)
-    
-    def create_summary_card(parent, title, value, color, col):
-        card = make_card(parent, padding=15)
-        card.grid(row=0, column=col, padx=10, sticky="nsew")
-        
-        title_label = styled_label(card, text=title, font=("Segoe UI", 10), foreground="#6c757d")
-        title_label.pack(anchor="w")
-        
-        value_label = styled_label(card, text=str(value), font=("Segoe UI", 24, "bold"), foreground=color)
-        value_label.pack(anchor="w", pady=(5, 0))
-        
+    summary_frame = QtWidgets.QWidget()
+    summary_layout = QtWidgets.QHBoxLayout(summary_frame)
+    summary_layout.setContentsMargins(0, 0, 0, 0)
+    summary_layout.setSpacing(10)
+
+    def create_summary_card(parent, title, value, color):
+        card = QtWidgets.QGroupBox(title)
+        card_layout = QtWidgets.QVBoxLayout(card)
+        card_layout.setContentsMargins(10, 10, 10, 10)
+
+        value_label = QtWidgets.QLabel(str(value))
+        value_label.setFont(QtGui.QFont("Segoe UI", 24, QtGui.QFont.Bold))
+        value_label.setStyleSheet(f"color: {color};")
+        card_layout.addWidget(value_label)
+
+        parent.layout().addWidget(card)
         return value_label
-    
+
     # Create summary cards (will be updated by update_summary)
-    unread_lbl = create_summary_card(summary_frame, "Unread", 0, COLOR_DANGER, 0)
-    critical_lbl = create_summary_card(summary_frame, "Critical", 0, COLOR_DANGER, 1)
-    warning_lbl = create_summary_card(summary_frame, "Warnings", 0, COLOR_WARNING, 2)
-    total_lbl = create_summary_card(summary_frame, "Total", 0, COLOR_PRIMARY, 3)
-    
+    unread_lbl = create_summary_card(summary_frame, "Unread", 0, COLOR_DANGER)
+    critical_lbl = create_summary_card(summary_frame, "Critical", 0, COLOR_DANGER)
+    warning_lbl = create_summary_card(summary_frame, "Warnings", 0, COLOR_WARNING)
+    total_lbl = create_summary_card(summary_frame, "Total", 0, COLOR_PRIMARY)
+
+    main_layout.addWidget(summary_frame)
+
     # Store labels for updates
     window.summary_labels = {
         'unread': unread_lbl,
@@ -64,45 +78,40 @@ def create_alerts_tab(parent, current_user=None):
         'warning': warning_lbl,
         'total': total_lbl
     }
-    
+
     # Filter toolbar
-    filter_frame = ttk.Frame(window)
-    filter_frame.pack(fill="x", pady=(0, 10))
-    
-    styled_label(filter_frame, "Filter:").pack(side=tk.LEFT, padx=(0, 10))
-    
-    filter_var = tk.StringVar(value="all")
-    filter_combo = ttk.Combobox(
-        filter_frame,
-        textvariable=filter_var,
-        values=["all", "unread", "critical", "high", "medium", "low"],
-        state="readonly",
-        width=15
-    )
-    filter_combo.pack(side=tk.LEFT, padx=5)
-    
-    type_filter_var = tk.StringVar(value="all")
-    type_combo = ttk.Combobox(
-        filter_frame,
-        textvariable=type_filter_var,
-        values=["all", "low_stock", "warranty_expiry", "out_of_stock", "system"],
-        state="readonly",
-        width=20
-    )
-    type_combo.pack(side=tk.LEFT, padx=5)
-    
+    filter_frame = QtWidgets.QWidget()
+    filter_layout = QtWidgets.QHBoxLayout(filter_frame)
+    filter_layout.setContentsMargins(0, 0, 0, 0)
+
+    filter_label = QtWidgets.QLabel("Filter:")
+    filter_layout.addWidget(filter_label)
+
+    filter_combo = QtWidgets.QComboBox()
+    filter_combo.addItems(["all", "unread", "critical", "high", "medium", "low"])
+    filter_layout.addWidget(filter_combo)
+
+    type_filter_combo = QtWidgets.QComboBox()
+    type_filter_combo.addItems(["all", "low_stock", "warranty_expiry", "out_of_stock", "system"])
+    filter_layout.addWidget(type_filter_combo)
+
     def apply_filter():
         window.refresh_alerts()
-    
-    make_button(filter_frame, "Apply", command=apply_filter, kind="primary").pack(side=tk.LEFT, padx=10)
-    
+
+    apply_btn = QtWidgets.QPushButton("Apply")
+    apply_btn.clicked.connect(apply_filter)
+    apply_btn.setStyleSheet("background-color: #007bff; color: white; padding: 5px 15px; border-radius: 3px;")
+    filter_layout.addWidget(apply_btn)
+
+    main_layout.addWidget(filter_frame)
+
     # Alerts table
-    table_frame = make_card(window, padding=10)
-    table_frame.pack(fill="both", expand=True)
-    
+    table_frame = QtWidgets.QWidget()
+    table_layout = QtWidgets.QVBoxLayout(table_frame)
+    table_layout.setContentsMargins(0, 0, 0, 0)
+
+    tree = QtWidgets.QTableWidget()
     columns = ("severity", "type", "title", "message", "date", "status")
-    tree = ttk.Treeview(table_frame, columns=columns, show="headings")
-    
     column_map = {
         "severity": ("!", 50),
         "type": ("Type", 120),
@@ -111,90 +120,107 @@ def create_alerts_tab(parent, current_user=None):
         "date": ("Date", 150),
         "status": ("Status", 100)
     }
-    
-    for col, (label_text, width) in column_map.items():
-        tree.heading(col, text=label_text, anchor="w")
-        tree.column(col, width=width, anchor="w" if col != "severity" else "center", minwidth=80)
-    
-    # Scrollbar
-    scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tree.yview)
-    tree.configure(yscrollcommand=scrollbar.set)
-    scrollbar.pack(side=tk.RIGHT, fill="y")
-    tree.pack(side=tk.LEFT, fill="both", expand=True)
-    
+
+    tree.setColumnCount(len(columns))
+    tree.setHorizontalHeaderLabels([column_map[c][0] for c in columns])
+    for i, col in enumerate(columns):
+        tree.horizontalHeader().resizeSection(i, column_map[col][1])
+    tree.horizontalHeader().setStretchLastSection(True)
+    table_layout.addWidget(tree)
+    main_layout.addWidget(table_frame, stretch=1)
+
     # Action buttons
-    action_bar = ttk.Frame(window)
-    action_bar.pack(fill="x", pady=(10, 0))
-    
+    action_bar = QtWidgets.QWidget()
+    action_layout = QtWidgets.QHBoxLayout(action_bar)
+    action_layout.setContentsMargins(0, 0, 0, 0)
+
     def on_mark_read():
-        sel = tree.selection()
-        if not sel:
-            messagebox.showinfo("Select", "Please select an alert to mark as read")
+        selected_rows = tree.selectionModel().selectedRows()
+        if not selected_rows:
+            QtWidgets.QMessageBox.information(window, "Select", "Please select an alert to mark as read")
             return
-        
+
         if alert_manager:
-            for item in sel:
-                alert_id = tree.item(item, "tags")[0] if tree.item(item, "tags") else None
+            for index in selected_rows:
+                row = index.row()
+                alert_id = tree.item(row, 0).data(QtCore.Qt.UserRole) if tree.item(row, 0) else None
                 if alert_id:
                     alert_manager.mark_as_read(int(alert_id))
-            
+
             window.refresh_alerts()
-            messagebox.showinfo("Success", "Alert(s) marked as read")
-    
+            QtWidgets.QMessageBox.information(window, "Success", "Alert(s) marked as read")
+
     def on_acknowledge():
-        sel = tree.selection()
-        if not sel:
-            messagebox.showinfo("Select", "Please select an alert to acknowledge")
+        selected_rows = tree.selectionModel().selectedRows()
+        if not selected_rows:
+            QtWidgets.QMessageBox.information(window, "Select", "Please select an alert to acknowledge")
             return
-        
+
         if alert_manager and current_user:
-            for item in sel:
-                alert_id = tree.item(item, "tags")[0] if tree.item(item, "tags") else None
+            for index in selected_rows:
+                row = index.row()
+                alert_id = tree.item(row, 0).data(QtCore.Qt.UserRole) if tree.item(row, 0) else None
                 if alert_id:
                     alert_manager.acknowledge_alert(int(alert_id), current_user)
-            
+
             window.refresh_alerts()
-            messagebox.showinfo("Success", "Alert(s) acknowledged")
-    
+            QtWidgets.QMessageBox.information(window, "Success", "Alert(s) acknowledged")
+
     def on_delete():
-        sel = tree.selection()
-        if not sel:
-            messagebox.showinfo("Select", "Please select an alert to delete")
+        selected_rows = tree.selectionModel().selectedRows()
+        if not selected_rows:
+            QtWidgets.QMessageBox.information(window, "Select", "Please select an alert to delete")
             return
-        
-        if messagebox.askyesno("Confirm", "Delete selected alert(s)?"):
+
+        reply = QtWidgets.QMessageBox.question(window, "Confirm", "Delete selected alert(s)?",
+                                               QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+        if reply == QtWidgets.QMessageBox.Yes:
             if alert_manager:
-                for item in sel:
-                    alert_id = tree.item(item, "tags")[0] if tree.item(item, "tags") else None
+                for index in selected_rows:
+                    row = index.row()
+                    alert_id = tree.item(row, 0).data(QtCore.Qt.UserRole) if tree.item(row, 0) else None
                     if alert_id:
                         alert_manager.delete_alert(int(alert_id))
-                
+
                 window.refresh_alerts()
-                messagebox.showinfo("Success", "Alert(s) deleted")
-    
-    make_button(action_bar, "📖 Mark Read", command=on_mark_read, kind="secondary").pack(side=tk.LEFT, padx=5)
-    make_button(action_bar, "✓ Acknowledge", command=on_acknowledge, kind="primary").pack(side=tk.LEFT, padx=5)
-    make_button(action_bar, "🗑️ Delete", command=on_delete, kind="danger").pack(side=tk.LEFT, padx=5)
-    
+                QtWidgets.QMessageBox.information(window, "Success", "Alert(s) deleted")
+
+    mark_read_btn = QtWidgets.QPushButton("Mark Read")
+    mark_read_btn.clicked.connect(on_mark_read)
+    mark_read_btn.setStyleSheet("padding: 5px 15px; border-radius: 3px;")
+    action_layout.addWidget(mark_read_btn)
+
+    ack_btn = QtWidgets.QPushButton("Acknowledge")
+    ack_btn.clicked.connect(on_acknowledge)
+    ack_btn.setStyleSheet("background-color: #007bff; color: white; padding: 5px 15px; border-radius: 3px;")
+    action_layout.addWidget(ack_btn)
+
+    delete_btn = QtWidgets.QPushButton("Delete")
+    delete_btn.clicked.connect(on_delete)
+    delete_btn.setStyleSheet("background-color: #dc3545; color: white; padding: 5px 15px; border-radius: 3px;")
+    action_layout.addWidget(delete_btn)
+
+    main_layout.addWidget(action_bar)
+
     # Store state
-    window.filter_var = filter_var
-    window.type_filter_var = type_filter_var
+    window.filter_combo = filter_combo
+    window.type_filter_combo = type_filter_combo
     window.tree = tree
-    
+
     def refresh():
         """Refresh alerts display."""
         if not alert_manager:
             return
-        
+
         # Get alerts
-        filter_type = filter_var.get()
-        type_filter = type_filter_var.get()
-        
+        filter_type = filter_combo.currentText()
+        type_filter = type_filter_combo.currentText()
+
         if filter_type == "unread":
             alerts = alert_manager.get_unread_alerts()
         else:
             alerts = alert_manager.get_all_alerts()
-        
+
         # Apply filters
         filtered = []
         for alert in alerts:
@@ -204,41 +230,47 @@ def create_alerts_tab(parent, current_user=None):
                 if alert.get('severity') != filter_type:
                     continue
             filtered.append(alert)
-        
+
         # Update table
-        tree.delete(*tree.get_children())
-        
+        tree.setRowCount(0)
+
         severity_icons = {
-            'critical': '🔴',
-            'high': '🟠',
-            'medium': '🟡',
-            'low': '🔵'
+            'critical': '\U0001f534',
+            'high': '\U0001f7e0',
+            'medium': '\U0001f7e1',
+            'low': '\U0001f535'
         }
-        
+
         for alert in filtered:
-            severity_icon = severity_icons.get(alert.get('severity', 'low'), '⚪')
-            
+            severity_icon = severity_icons.get(alert.get('severity', 'low'), '\u26aa')
+
             status = "Read" if alert.get('is_read') else "Unread"
             if alert.get('is_acknowledged'):
                 status = "Acknowledged"
-            
-            tags = (str(alert.get('id', '')),)
-            
-            tree.insert("", "end", values=(
+
+            alert_id = alert.get('id', '')
+            row = tree.rowCount()
+            tree.insertRow(row)
+
+            for col, val in enumerate([
                 severity_icon,
                 alert.get('alert_type', '').replace('_', ' ').title(),
                 alert.get('title', ''),
                 alert.get('message', '')[:100] + ('...' if len(alert.get('message', '')) > 100 else ''),
                 alert.get('created_at', '')[:16] if alert.get('created_at') else '',
                 status
-            ), tags=tags)
-        
+            ]):
+                item = QtWidgets.QTableWidgetItem(str(val))
+                if alert_id:
+                    item.setData(QtCore.Qt.UserRole, alert_id)
+                tree.setItem(row, col, item)
+
         # Update summary
         update_summary(window)
-    
+
     window.refresh_alerts = refresh
     window.refresh_alerts()
-    
+
     return window
 
 
@@ -246,19 +278,19 @@ def update_summary(window):
     """Update summary cards."""
     if not alert_manager or not hasattr(window, 'summary_labels'):
         return
-    
+
     try:
         unread = alert_manager.get_alert_count(unread_only=True)
         all_alerts = alert_manager.get_all_alerts()
-        
+
         critical = sum(1 for a in all_alerts if a.get('severity') == 'critical' and not a.get('is_read'))
         warning = sum(1 for a in all_alerts if a.get('severity') in ['high', 'medium'] and not a.get('is_read'))
         total = len(all_alerts)
-        
-        window.summary_labels['unread'].config(text=str(unread))
-        window.summary_labels['critical'].config(text=str(critical))
-        window.summary_labels['warning'].config(text=str(warning))
-        window.summary_labels['total'].config(text=str(total))
+
+        window.summary_labels['unread'].setText(str(unread))
+        window.summary_labels['critical'].setText(str(critical))
+        window.summary_labels['warning'].setText(str(warning))
+        window.summary_labels['total'].setText(str(total))
     except Exception as e:
         logging.error(f"Failed to update alert summary: {e}")
 
@@ -267,7 +299,7 @@ def mark_all_read(window):
     """Mark all alerts as read."""
     if not alert_manager:
         return
-    
+
     count = alert_manager.mark_all_as_read()
     window.refresh_alerts()
-    messagebox.showinfo("Success", f"Marked {count} alert(s) as read")
+    QtWidgets.QMessageBox.information(window, "Success", f"Marked {count} alert(s) as read")

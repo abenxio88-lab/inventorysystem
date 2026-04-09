@@ -3,11 +3,10 @@
 # Install: pip install -r requirements.txt
 
 # ============================================
-# MODERN UI FRAMEWORK
+# MODERN UI FRAMEWORK - PySide6 (Qt for Python)
 # ============================================
-customtkinter>=5.2.0       # Modern UI framework (RECOMMENDED)
-darkdetect>=0.8.0          # Dark/light mode detection
-ctkmessagebox>=2.0.0       # Modern message boxes
+PySide6>=6.6.0             # Professional desktop UI framework (Qt6)
+PySide6-Addons>=6.6.0      # Additional Qt modules (charts, etc.)
 
 # Core Dependencies
 openpyxl>=3.1.2            # Excel export/import
@@ -73,7 +72,3 @@ opencv-python>=4.8.0       # Camera access & image processing
 # Barcode Scanning
 # pyzbar>=0.1.9
 # opencv-python>=4.8.0
-
-# Additional UI Components (Optional)
-# ttkbootstrap>=1.10.0     # Bootstrap themes for Tkinter
-# tkcalendar>=1.6.1        # Date picker widget

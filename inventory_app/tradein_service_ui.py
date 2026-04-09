@@ -5,8 +5,11 @@ Trade-in valuation and service ticket management.
 Phase 5 - Complete Implementation
 """
 
-import tkinter as tk
-from tkinter import ttk, messagebox
+from PySide6.QtWidgets import (QFrame, QLabel, QPushButton, QDialog, QVBoxLayout, QHBoxLayout,
+                               QGridLayout, QFormLayout, QComboBox, QLineEdit, QTextEdit,
+                               QHeaderView, QAbstractItemView, QScrollArea, QWidget)
+from PySide6.QtCore import Qt, QSize
+from PySide6.QtGui import QFont
 import logging
 from datetime import datetime
 
@@ -16,57 +19,71 @@ from ui_theme import make_card, styled_label, make_button, FONT_HEADING, FONT_BO
 
 def create_trade_ins_tab(parent, current_user=None):
     """Creates the trade-in management tab."""
-    window = ttk.Frame(parent, padding=15)
+    window = QFrame()
+    window.setFrameShape(QFrame.NoFrame)
+    layout = QVBoxLayout(window)
+    layout.setContentsMargins(15, 15, 15, 15)
 
     # Header
-    header_frame = ttk.Frame(window)
-    header_frame.pack(fill="x", pady=(0, 15))
+    header_frame = QFrame()
+    header_layout = QHBoxLayout(header_frame)
+    header_layout.setContentsMargins(0, 0, 0, 0)
 
-    styled_label(header_frame, "\U0001f4b1 Trade-In Management", font=FONT_HEADING).pack(side=tk.LEFT)
+    styled_label(header_layout, "\U0001f4b1 Trade-In Management", font=FONT_HEADING)
 
     def open_new_trade_in():
         open_trade_in_dialog(window, current_user=current_user)
 
-    make_button(header_frame, "\u2795 New Trade-In", command=open_new_trade_in, kind="success").pack(side=tk.RIGHT)
+    make_button(header_layout, "\u2795 New Trade-In", command=open_new_trade_in, kind="success")
+
+    layout.addWidget(header_frame)
 
     # Summary
-    summary_frame = ttk.Frame(window)
-    summary_frame.pack(fill="x", pady=(0, 15))
-    summary_frame.grid_columnconfigure((0, 1, 2), weight=1)
+    summary_frame = QFrame()
+    summary_layout = QGridLayout(summary_frame)
+    summary_layout.setContentsMargins(0, 0, 0, 0)
+    for i in range(3):
+        summary_layout.setColumnStretch(i, 1)
 
-    def create_summary_card(parent, title, value, col):
-        card = make_card(parent, padding=12)
-        card.grid(row=0, column=col, padx=8, sticky="nsew")
-        styled_label(card, text=title, font=("Segoe UI", 9), foreground="#6c757d").pack(anchor="w")
-        value_label = styled_label(card, text=str(value), font=("Segoe UI", 20, "bold"), foreground=COLOR_PRIMARY)
-        value_label.pack(anchor="w", pady=(3, 0))
+    summary_labels = {}
+
+    def create_summary_card(parent_layout, title, value, col):
+        card = make_card(parent_layout, padding=12)
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(8, 8, 8, 8)
+        styled_label(card_layout, text=title, font=("Segoe UI", 9), foreground="#6c757d")
+        value_label = styled_label(card_layout, text=str(value), font=("Segoe UI", 20, "bold"), foreground=COLOR_PRIMARY)
+        parent_layout.addWidget(card, 0, col)
         return value_label
 
-    pending_lbl = create_summary_card(summary_frame, "Pending", 0, 0)
-    completed_lbl = create_summary_card(summary_frame, "Completed", 0, 1)
-    total_value_lbl = create_summary_card(summary_frame, "Total Value", "Rs. 0", 2)
+    pending_lbl = create_summary_card(summary_layout, "Pending", 0, 0)
+    completed_lbl = create_summary_card(summary_layout, "Completed", 0, 1)
+    total_value_lbl = create_summary_card(summary_layout, "Total Value", "Rs. 0", 2)
 
-    window.summary_labels = {'pending': pending_lbl, 'completed': completed_lbl, 'total_value': total_value_lbl}
+    summary_labels = {'pending': pending_lbl, 'completed': completed_lbl, 'total_value': total_value_lbl}
+    layout.addWidget(summary_frame)
 
     # Table
     table_frame = make_card(window, padding=10)
-    table_frame.pack(fill="both", expand=True)
+    table_layout = QVBoxLayout(table_frame)
+    table_layout.setContentsMargins(0, 0, 0, 0)
 
+    from PySide6.QtWidgets import QTableWidget, QTableWidgetItem
+    tree = QTableWidget()
     columns = ("trade_in_number", "customer", "product", "value", "credit", "status")
-    tree = ttk.Treeview(table_frame, columns=columns, show="headings")
+    tree.setColumnCount(len(columns))
+    tree.setHorizontalHeaderLabels([col.replace('_', ' ').title() for col in columns])
+    tree.setSelectionBehavior(QAbstractItemView.SelectRows)
+    tree.setEditTriggers(QAbstractItemView.NoEditTriggers)
+    tree.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+    tree.verticalHeader().setVisible(False)
 
-    for col in columns:
-        tree.heading(col, text=col.replace('_', ' ').title())
-        tree.column(col, width=120)
-
-    scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tree.yview)
-    tree.configure(yscrollcommand=scrollbar.set)
-    scrollbar.pack(side=tk.RIGHT, fill="y")
-    tree.pack(side=tk.LEFT, fill="both", expand=True)
+    table_layout.addWidget(tree)
+    layout.addWidget(table_frame)
 
     def refresh_from_db():
         """Reload trade-in data from the database via services."""
-        tree.delete(*tree.get_children())
+        tree.setRowCount(0)
         trades = svc.tradein.get_all_trade_ins()
 
         counts = {'pending': 0, 'completed': 0, 'total_value': 0}
@@ -76,18 +93,18 @@ def create_trade_ins_tab(parent, current_user=None):
                 counts[status] += 1
             counts['total_value'] += t.get('trade_in_value', 0) or 0
 
-            tree.insert("", "end", values=(
-                t.get('trade_in_number', ''),
-                t.get('customer_name', ''),
-                t.get('product_name', ''),
-                f"Rs. {t.get('trade_in_value', 0):,.2f}",
-                f"Rs. {t.get('credit_amount', 0):,.2f}",
-                status.title()
-            ), tags=(str(t.get('trade_in_id', '')),))
+            row = tree.rowCount()
+            tree.insertRow(row)
+            tree.setItem(row, 0, QTableWidgetItem(t.get('trade_in_number', '')))
+            tree.setItem(row, 1, QTableWidgetItem(t.get('customer_name', '')))
+            tree.setItem(row, 2, QTableWidgetItem(t.get('product_name', '')))
+            tree.setItem(row, 3, QTableWidgetItem(f"Rs. {t.get('trade_in_value', 0):,.2f}"))
+            tree.setItem(row, 4, QTableWidgetItem(f"Rs. {t.get('credit_amount', 0):,.2f}"))
+            tree.setItem(row, 5, QTableWidgetItem(status.title()))
 
-        window.summary_labels['pending'].config(text=str(counts['pending']))
-        window.summary_labels['completed'].config(text=str(counts['completed']))
-        window.summary_labels['total_value'].config(text=f"Rs. {counts['total_value']:,.2f}")
+        summary_labels['pending'].setText(str(counts['pending']))
+        summary_labels['completed'].setText(str(counts['completed']))
+        summary_labels['total_value'].setText(f"Rs. {counts['total_value']:,.2f}")
 
     window.refresh = refresh_from_db
     refresh_from_db()
@@ -97,74 +114,77 @@ def create_trade_ins_tab(parent, current_user=None):
 
 def open_trade_in_dialog(parent, current_user=None):
     """Dialog to create a new trade-in."""
-    dlg = tk.Toplevel(parent)
-    dlg.title("New Trade-In")
-    dlg.geometry("700x750")
-    dlg.resizable(True, True)
-    dlg.minsize(600, 650)
-    dlg.transient(parent)
-    dlg.grab_set()
+    from PySide6.QtWidgets import QDialog
+    dlg = QDialog(parent)
+    dlg.setWindowTitle("New Trade-In")
+    dlg.resize(700, 750)
+    dlg.setMinimumSize(600, 650)
+    dlg.setModal(True)
 
-    content = ttk.Frame(dlg, padding=20)
-    content.pack(fill=tk.BOTH, expand=True)
+    content = QFrame()
+    content_layout = QVBoxLayout(content)
+    content_layout.setContentsMargins(20, 20, 20, 20)
 
-    styled_label(content, "\U0001f4b1 New Trade-In", font=FONT_HEADING).pack(anchor=tk.W, pady=(0, 15))
+    styled_label(content_layout, "\U0001f4b1 New Trade-In", font=FONT_HEADING)
 
     form_frame = make_card(content, padding=20)
-    form_frame.pack(fill=tk.BOTH, expand=True)
-    form_frame.grid_columnconfigure(1, weight=1)
+    form_layout = QGridLayout(form_frame)
+    form_layout.setColumnStretch(1, 1)
 
     # Customer
-    styled_label(form_frame, "Customer Name *:", font=FONT_BOLD).grid(row=0, column=0, sticky=tk.W, pady=5)
-    customer_var = tk.StringVar()
-    ttk.Entry(form_frame, textvariable=customer_var, width=30).grid(row=1, column=0, columnspan=2, sticky=tk.EW, pady=5)
+    form_layout.addWidget(styled_label(None, "Customer Name *:", font=FONT_BOLD), 0, 0, alignment=Qt.AlignLeft)
+    customer_var = QLineEdit()
+    form_layout.addWidget(customer_var, 1, 0, 1, 2)
 
     # Phone
-    styled_label(form_frame, "Phone:", font=FONT_BOLD).grid(row=2, column=0, sticky=tk.W, pady=5)
-    phone_var = tk.StringVar()
-    ttk.Entry(form_frame, textvariable=phone_var, width=30).grid(row=3, column=0, columnspan=2, sticky=tk.EW, pady=5)
+    form_layout.addWidget(styled_label(None, "Phone:", font=FONT_BOLD), 2, 0, alignment=Qt.AlignLeft)
+    phone_var = QLineEdit()
+    form_layout.addWidget(phone_var, 3, 0, 1, 2)
 
     # Product
-    styled_label(form_frame, "Product Name *:", font=FONT_BOLD).grid(row=4, column=0, sticky=tk.W, pady=5)
-    product_var = tk.StringVar()
-    ttk.Entry(form_frame, textvariable=product_var, width=30).grid(row=5, column=0, columnspan=2, sticky=tk.EW, pady=5)
+    form_layout.addWidget(styled_label(None, "Product Name *:", font=FONT_BOLD), 4, 0, alignment=Qt.AlignLeft)
+    product_var = QLineEdit()
+    form_layout.addWidget(product_var, 5, 0, 1, 2)
 
     # Condition
-    styled_label(form_frame, "Condition:", font=FONT_BOLD).grid(row=6, column=0, sticky=tk.W, pady=5)
-    condition_var = tk.StringVar(value="good")
-    condition_combo = ttk.Combobox(form_frame, textvariable=condition_var, values=[
-        "excellent", "good", "fair", "poor", "damaged"
-    ], state="readonly", width=28)
-    condition_combo.grid(row=7, column=0, columnspan=2, sticky=tk.EW, pady=5)
+    form_layout.addWidget(styled_label(None, "Condition:", font=FONT_BOLD), 6, 0, alignment=Qt.AlignLeft)
+    condition_var = QComboBox()
+    condition_var.addItems(["excellent", "good", "fair", "poor", "damaged"])
+    condition_var.setCurrentText("good")
+    form_layout.addWidget(condition_var, 7, 0, 1, 2)
 
     # Value
-    styled_label(form_frame, "Trade-In Value (Rs.):", font=FONT_BOLD).grid(row=8, column=0, sticky=tk.W, pady=5)
-    value_var = tk.StringVar(value="0")
-    ttk.Entry(form_frame, textvariable=value_var, width=15).grid(row=9, column=0, sticky=tk.W, pady=5)
+    form_layout.addWidget(styled_label(None, "Trade-In Value (Rs.):", font=FONT_BOLD), 8, 0, alignment=Qt.AlignLeft)
+    value_var = QLineEdit("0")
+    form_layout.addWidget(value_var, 9, 0)
 
     # Credit
-    styled_label(form_frame, "Credit Amount (Rs.):", font=FONT_BOLD).grid(row=8, column=1, sticky=tk.W, pady=5)
-    credit_var = tk.StringVar(value="0")
-    ttk.Entry(form_frame, textvariable=credit_var, width=15).grid(row=9, column=1, sticky=tk.W, pady=5)
+    form_layout.addWidget(styled_label(None, "Credit Amount (Rs.):", font=FONT_BOLD), 8, 1, alignment=Qt.AlignLeft)
+    credit_var = QLineEdit("0")
+    form_layout.addWidget(credit_var, 9, 1)
 
     # Notes
-    styled_label(form_frame, "Notes:", font=FONT_BOLD).grid(row=10, column=0, sticky=tk.W, pady=5)
-    notes_text = tk.Text(form_frame, height=3, width=40)
-    notes_text.grid(row=11, column=0, columnspan=2, sticky=tk.EW, pady=5)
+    form_layout.addWidget(styled_label(None, "Notes:", font=FONT_BOLD), 10, 0, alignment=Qt.AlignLeft)
+    notes_text = QTextEdit()
+    notes_text.setMaximumHeight(60)
+    form_layout.addWidget(notes_text, 11, 0, 1, 2)
 
+    content_layout.addWidget(form_frame)
+
+    from PySide6.QtWidgets import QMessageBox
     def save():
-        customer = customer_var.get().strip()
-        product = product_var.get().strip()
+        customer = customer_var.text().strip()
+        product = product_var.text().strip()
 
         if not customer or not product:
-            messagebox.showerror("Error", "Customer name and product required")
+            QMessageBox.critical(dlg, "Error", "Customer name and product required")
             return
 
         try:
-            value = float(value_var.get())
-            credit = float(credit_var.get())
+            value = float(value_var.text())
+            credit = float(credit_var.text())
         except (ValueError, TypeError):
-            messagebox.showerror("Error", "Invalid value/credit amount")
+            QMessageBox.critical(dlg, "Error", "Invalid value/credit amount")
             return
 
         trade_number = f"TI-{datetime.now().strftime('%Y%m%d%H%M')}"
@@ -172,9 +192,9 @@ def open_trade_in_dialog(parent, current_user=None):
         data = {
             'trade_in_number': trade_number,
             'customer_name': customer,
-            'customer_phone': phone_var.get(),
+            'customer_phone': phone_var.text(),
             'product_name': product,
-            'product_condition': condition_var.get(),
+            'product_condition': condition_var.currentText(),
             'trade_in_value': value,
             'credit_amount': credit,
             'status': 'pending',
@@ -183,75 +203,92 @@ def open_trade_in_dialog(parent, current_user=None):
 
         try:
             svc.tradein.create_trade_in(data, current_user)
-            messagebox.showinfo("Success", f"Trade-in created: {trade_number}")
-            dlg.destroy()
+            QMessageBox.information(dlg, "Success", f"Trade-in created: {trade_number}")
+            dlg.accept()
             if hasattr(parent, 'refresh'):
                 parent.refresh()
         except Exception as e:
             logging.exception("Failed to create trade-in")
-            messagebox.showerror("Error", f"Failed: {e}")
+            QMessageBox.critical(dlg, "Error", f"Failed: {e}")
 
-    btn_frame = ttk.Frame(content)
-    btn_frame.pack(fill=tk.X, pady=(15, 0))
-    make_button(btn_frame, "\U0001f4be Create", command=save, kind="success", width=BTN_WIDTH['action']).pack(side=tk.LEFT, padx=5)
-    make_button(btn_frame, "Cancel", command=dlg.destroy, kind="secondary", width=BTN_WIDTH['dialog']).pack(side=tk.LEFT, padx=5)
+    btn_frame = QFrame()
+    btn_layout = QHBoxLayout(btn_frame)
+    btn_layout.setContentsMargins(0, 0, 0, 0)
+    make_button(btn_layout, "\U0001f4be Create", command=save, kind="success", width=BTN_WIDTH['action'])
+    make_button(btn_layout, "Cancel", command=dlg.reject, kind="secondary", width=BTN_WIDTH['dialog'])
+    content_layout.addWidget(btn_frame)
+
+    dlg.setLayout(content_layout)
+    dlg.exec()
 
 
 def create_service_tab(parent, current_user=None):
     """Creates the service/repair management tab."""
-    window = ttk.Frame(parent, padding=15)
+    window = QFrame()
+    window.setFrameShape(QFrame.NoFrame)
+    layout = QVBoxLayout(window)
+    layout.setContentsMargins(15, 15, 15, 15)
 
     # Header
-    header_frame = ttk.Frame(window)
-    header_frame.pack(fill="x", pady=(0, 15))
+    header_frame = QFrame()
+    header_layout = QHBoxLayout(header_frame)
+    header_layout.setContentsMargins(0, 0, 0, 0)
 
-    styled_label(header_frame, "\U0001f527 Service & Repair", font=FONT_HEADING).pack(side=tk.LEFT)
+    styled_label(header_layout, "\U0001f527 Service & Repair", font=FONT_HEADING)
 
     def open_new_ticket():
         open_service_ticket_dialog(window, current_user=current_user)
 
-    make_button(header_frame, "\u2795 New Service Ticket", command=open_new_ticket, kind="warning").pack(side=tk.RIGHT)
+    make_button(header_layout, "\u2795 New Service Ticket", command=open_new_ticket, kind="warning")
+
+    layout.addWidget(header_frame)
 
     # Summary
-    summary_frame = ttk.Frame(window)
-    summary_frame.pack(fill="x", pady=(0, 15))
-    summary_frame.grid_columnconfigure((0, 1, 2, 3), weight=1)
+    summary_frame = QFrame()
+    summary_layout = QGridLayout(summary_frame)
+    summary_layout.setContentsMargins(0, 0, 0, 0)
+    for i in range(4):
+        summary_layout.setColumnStretch(i, 1)
 
-    def create_summary_card(parent, title, value, col):
-        card = make_card(parent, padding=12)
-        card.grid(row=0, column=col, padx=8, sticky="nsew")
-        styled_label(card, text=title, font=("Segoe UI", 9), foreground="#6c757d").pack(anchor="w")
-        value_label = styled_label(card, text=str(value), font=("Segoe UI", 20, "bold"), foreground=COLOR_PRIMARY)
-        value_label.pack(anchor="w", pady=(3, 0))
+    def create_summary_card(parent_layout, title, value, col):
+        card = make_card(parent_layout, padding=12)
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(8, 8, 8, 8)
+        styled_label(card_layout, text=title, font=("Segoe UI", 9), foreground="#6c757d")
+        value_label = styled_label(card_layout, text=str(value), font=("Segoe UI", 20, "bold"), foreground=COLOR_PRIMARY)
+        parent_layout.addWidget(card, 0, col)
         return value_label
 
-    received_lbl = create_summary_card(summary_frame, "Received", 0, 0)
-    in_progress_lbl = create_summary_card(summary_frame, "In Progress", 0, 1)
-    completed_lbl = create_summary_card(summary_frame, "Completed", 0, 2)
-    revenue_lbl = create_summary_card(summary_frame, "Revenue", "Rs. 0", 3)
+    received_lbl = create_summary_card(summary_layout, "Received", 0, 0)
+    in_progress_lbl = create_summary_card(summary_layout, "In Progress", 0, 1)
+    completed_lbl = create_summary_card(summary_layout, "Completed", 0, 2)
+    revenue_lbl = create_summary_card(summary_layout, "Revenue", "Rs. 0", 3)
 
-    window.summary_labels = {'received': received_lbl, 'in_progress': in_progress_lbl,
-                            'completed': completed_lbl, 'revenue': revenue_lbl}
+    summary_labels = {'received': received_lbl, 'in_progress': in_progress_lbl,
+                      'completed': completed_lbl, 'revenue': revenue_lbl}
+    layout.addWidget(summary_frame)
 
     # Table
     table_frame = make_card(window, padding=10)
-    table_frame.pack(fill="both", expand=True)
+    table_layout = QVBoxLayout(table_frame)
+    table_layout.setContentsMargins(0, 0, 0, 0)
 
+    from PySide6.QtWidgets import QTableWidget, QTableWidgetItem
+    tree = QTableWidget()
     columns = ("ticket_number", "customer", "device", "status", "estimated", "received_date")
-    tree = ttk.Treeview(table_frame, columns=columns, show="headings")
+    tree.setColumnCount(len(columns))
+    tree.setHorizontalHeaderLabels([col.replace('_', ' ').title() for col in columns])
+    tree.setSelectionBehavior(QAbstractItemView.SelectRows)
+    tree.setEditTriggers(QAbstractItemView.NoEditTriggers)
+    tree.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+    tree.verticalHeader().setVisible(False)
 
-    for col in columns:
-        tree.heading(col, text=col.replace('_', ' ').title())
-        tree.column(col, width=120)
-
-    scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tree.yview)
-    tree.configure(yscrollcommand=scrollbar.set)
-    scrollbar.pack(side=tk.RIGHT, fill="y")
-    tree.pack(side=tk.LEFT, fill="both", expand=True)
+    table_layout.addWidget(tree)
+    layout.addWidget(table_frame)
 
     def refresh_from_db():
         """Reload service tickets from the database via services."""
-        tree.delete(*tree.get_children())
+        tree.setRowCount(0)
         tickets = svc.service_ticket.get_all_tickets()
 
         counts = {'received': 0, 'in_progress': 0, 'completed': 0, 'revenue': 0}
@@ -266,19 +303,19 @@ def create_service_tab(parent, current_user=None):
             if not device:
                 device = t.get('device_type', '')
 
-            tree.insert("", "end", values=(
-                t.get('ticket_number', ''),
-                t.get('customer_name', ''),
-                device,
-                status.replace('_', ' ').title(),
-                f"Rs. {t.get('estimated_cost', 0):,.2f}",
-                t.get('received_date', 'N/A')[:10] if t.get('received_date') else 'N/A'
-            ), tags=(str(t.get('ticket_id', '')),))
+            row = tree.rowCount()
+            tree.insertRow(row)
+            tree.setItem(row, 0, QTableWidgetItem(t.get('ticket_number', '')))
+            tree.setItem(row, 1, QTableWidgetItem(t.get('customer_name', '')))
+            tree.setItem(row, 2, QTableWidgetItem(device))
+            tree.setItem(row, 3, QTableWidgetItem(status.replace('_', ' ').title()))
+            tree.setItem(row, 4, QTableWidgetItem(f"Rs. {t.get('estimated_cost', 0):,.2f}"))
+            tree.setItem(row, 5, QTableWidgetItem(t.get('received_date', 'N/A')[:10] if t.get('received_date') else 'N/A'))
 
-        window.summary_labels['received'].config(text=str(counts['received']))
-        window.summary_labels['in_progress'].config(text=str(counts['in_progress']))
-        window.summary_labels['completed'].config(text=str(counts['completed']))
-        window.summary_labels['revenue'].config(text=f"Rs. {counts['revenue']:,.2f}")
+        summary_labels['received'].setText(str(counts['received']))
+        summary_labels['in_progress'].setText(str(counts['in_progress']))
+        summary_labels['completed'].setText(str(counts['completed']))
+        summary_labels['revenue'].setText(f"Rs. {counts['revenue']:,.2f}")
 
     window.refresh = refresh_from_db
     refresh_from_db()
@@ -288,72 +325,75 @@ def create_service_tab(parent, current_user=None):
 
 def open_service_ticket_dialog(parent, current_user=None):
     """Dialog to create a new service ticket."""
-    dlg = tk.Toplevel(parent)
-    dlg.title("New Service Ticket")
-    dlg.geometry("800x850")
-    dlg.resizable(True, True)
-    dlg.minsize(650, 700)
-    dlg.transient(parent)
-    dlg.grab_set()
+    from PySide6.QtWidgets import QDialog, QMessageBox
+    dlg = QDialog(parent)
+    dlg.setWindowTitle("New Service Ticket")
+    dlg.resize(800, 850)
+    dlg.setMinimumSize(650, 700)
+    dlg.setModal(True)
 
-    content = ttk.Frame(dlg, padding=20)
-    content.pack(fill=tk.BOTH, expand=True)
+    content = QFrame()
+    content_layout = QVBoxLayout(content)
+    content_layout.setContentsMargins(20, 20, 20, 20)
 
-    styled_label(content, "\U0001f527 New Service Ticket", font=FONT_HEADING).pack(anchor=tk.W, pady=(0, 15))
+    styled_label(content_layout, "\U0001f527 New Service Ticket", font=FONT_HEADING)
 
     form_frame = make_card(content, padding=20)
-    form_frame.pack(fill=tk.BOTH, expand=True)
-    form_frame.grid_columnconfigure(1, weight=1)
+    form_layout = QGridLayout(form_frame)
+    form_layout.setColumnStretch(1, 1)
 
     # Customer
-    styled_label(form_frame, "Customer Name *:", font=FONT_BOLD).grid(row=0, column=0, sticky=tk.W, pady=5)
-    customer_var = tk.StringVar()
-    ttk.Entry(form_frame, textvariable=customer_var, width=30).grid(row=1, column=0, columnspan=2, sticky=tk.EW, pady=5)
+    form_layout.addWidget(styled_label(None, "Customer Name *:", font=FONT_BOLD), 0, 0, alignment=Qt.AlignLeft)
+    customer_var = QLineEdit()
+    form_layout.addWidget(customer_var, 1, 0, 1, 2)
 
     # Phone
-    styled_label(form_frame, "Phone:", font=FONT_BOLD).grid(row=2, column=0, sticky=tk.W, pady=5)
-    phone_var = tk.StringVar()
-    ttk.Entry(form_frame, textvariable=phone_var, width=30).grid(row=3, column=0, columnspan=2, sticky=tk.EW, pady=5)
+    form_layout.addWidget(styled_label(None, "Phone:", font=FONT_BOLD), 2, 0, alignment=Qt.AlignLeft)
+    phone_var = QLineEdit()
+    form_layout.addWidget(phone_var, 3, 0, 1, 2)
 
     # Email
-    styled_label(form_frame, "Email:", font=FONT_BOLD).grid(row=4, column=0, sticky=tk.W, pady=5)
-    email_var = tk.StringVar()
-    ttk.Entry(form_frame, textvariable=email_var, width=30).grid(row=5, column=0, columnspan=2, sticky=tk.EW, pady=5)
+    form_layout.addWidget(styled_label(None, "Email:", font=FONT_BOLD), 4, 0, alignment=Qt.AlignLeft)
+    email_var = QLineEdit()
+    form_layout.addWidget(email_var, 5, 0, 1, 2)
 
     # Device
-    styled_label(form_frame, "Device Type:", font=FONT_BOLD).grid(row=6, column=0, sticky=tk.W, pady=5)
-    device_type_var = tk.StringVar()
-    ttk.Entry(form_frame, textvariable=device_type_var, width=30).grid(row=7, column=0, columnspan=2, sticky=tk.EW, pady=5)
+    form_layout.addWidget(styled_label(None, "Device Type:", font=FONT_BOLD), 6, 0, alignment=Qt.AlignLeft)
+    device_type_var = QLineEdit()
+    form_layout.addWidget(device_type_var, 7, 0, 1, 2)
 
-    styled_label(form_frame, "Brand:", font=FONT_BOLD).grid(row=8, column=0, sticky=tk.W, pady=5)
-    brand_var = tk.StringVar()
-    ttk.Entry(form_frame, textvariable=brand_var, width=15).grid(row=9, column=0, sticky=tk.W, pady=5)
+    form_layout.addWidget(styled_label(None, "Brand:", font=FONT_BOLD), 8, 0, alignment=Qt.AlignLeft)
+    brand_var = QLineEdit()
+    form_layout.addWidget(brand_var, 9, 0)
 
-    styled_label(form_frame, "Model:", font=FONT_BOLD).grid(row=8, column=1, sticky=tk.W, pady=5)
-    model_var = tk.StringVar()
-    ttk.Entry(form_frame, textvariable=model_var, width=15).grid(row=9, column=1, sticky=tk.W, pady=5)
+    form_layout.addWidget(styled_label(None, "Model:", font=FONT_BOLD), 8, 1, alignment=Qt.AlignLeft)
+    model_var = QLineEdit()
+    form_layout.addWidget(model_var, 9, 1)
 
     # Serial
-    styled_label(form_frame, "Serial Number:", font=FONT_BOLD).grid(row=10, column=0, sticky=tk.W, pady=5)
-    serial_var = tk.StringVar()
-    ttk.Entry(form_frame, textvariable=serial_var, width=30).grid(row=11, column=0, columnspan=2, sticky=tk.EW, pady=5)
+    form_layout.addWidget(styled_label(None, "Serial Number:", font=FONT_BOLD), 10, 0, alignment=Qt.AlignLeft)
+    serial_var = QLineEdit()
+    form_layout.addWidget(serial_var, 11, 0, 1, 2)
 
     # Issue
-    styled_label(form_frame, "Issue Description *:", font=FONT_BOLD).grid(row=12, column=0, sticky=tk.W, pady=5)
-    issue_text = tk.Text(form_frame, height=3, width=40)
-    issue_text.grid(row=13, column=0, columnspan=2, sticky=tk.EW, pady=5)
+    form_layout.addWidget(styled_label(None, "Issue Description *:", font=FONT_BOLD), 12, 0, alignment=Qt.AlignLeft)
+    issue_text = QTextEdit()
+    issue_text.setMaximumHeight(60)
+    form_layout.addWidget(issue_text, 13, 0, 1, 2)
 
     # Estimated cost
-    styled_label(form_frame, "Estimated Cost (Rs.):", font=FONT_BOLD).grid(row=14, column=0, sticky=tk.W, pady=5)
-    cost_var = tk.StringVar(value="0")
-    ttk.Entry(form_frame, textvariable=cost_var, width=15).grid(row=15, column=0, sticky=tk.W, pady=5)
+    form_layout.addWidget(styled_label(None, "Estimated Cost (Rs.):", font=FONT_BOLD), 14, 0, alignment=Qt.AlignLeft)
+    cost_var = QLineEdit("0")
+    form_layout.addWidget(cost_var, 15, 0)
+
+    content_layout.addWidget(form_frame)
 
     def save():
-        customer = customer_var.get().strip()
-        issue = issue_text.get("1.0", tk.END).strip()
+        customer = customer_var.text().strip()
+        issue = issue_text.toPlainText().strip()
 
         if not customer or not issue:
-            messagebox.showerror("Error", "Customer name and issue description required")
+            QMessageBox.critical(dlg, "Error", "Customer name and issue description required")
             return
 
         ticket_number = f"SVC-{datetime.now().strftime('%Y%m%d%H%M')}"
@@ -361,29 +401,34 @@ def open_service_ticket_dialog(parent, current_user=None):
         data = {
             'ticket_number': ticket_number,
             'customer_name': customer,
-            'customer_phone': phone_var.get(),
-            'customer_email': email_var.get(),
-            'device_type': device_type_var.get(),
-            'device_brand': brand_var.get(),
-            'device_model': model_var.get(),
-            'serial_number': serial_var.get(),
+            'customer_phone': phone_var.text(),
+            'customer_email': email_var.text(),
+            'device_type': device_type_var.text(),
+            'device_brand': brand_var.text(),
+            'device_model': model_var.text(),
+            'serial_number': serial_var.text(),
             'issue_description': issue,
-            'estimated_cost': float(cost_var.get()),
+            'estimated_cost': float(cost_var.text()),
             'status': 'received',
             'created_by': current_user,
         }
 
         try:
             svc.service_ticket.create_ticket(data, current_user)
-            messagebox.showinfo("Success", f"Service ticket created: {ticket_number}")
-            dlg.destroy()
+            QMessageBox.information(dlg, "Success", f"Service ticket created: {ticket_number}")
+            dlg.accept()
             if hasattr(parent, 'refresh'):
                 parent.refresh()
         except Exception as e:
             logging.exception("Failed to create service ticket")
-            messagebox.showerror("Error", f"Failed: {e}")
+            QMessageBox.critical(dlg, "Error", f"Failed: {e}")
 
-    btn_frame = ttk.Frame(content)
-    btn_frame.pack(fill=tk.X, pady=(15, 0))
-    make_button(btn_frame, "\U0001f4be Create Ticket", command=save, kind="warning", width=BTN_WIDTH['action']).pack(side=tk.LEFT, padx=5)
-    make_button(btn_frame, "Cancel", command=dlg.destroy, kind="secondary", width=BTN_WIDTH['dialog']).pack(side=tk.LEFT, padx=5)
+    btn_frame = QFrame()
+    btn_layout = QHBoxLayout(btn_frame)
+    btn_layout.setContentsMargins(0, 0, 0, 0)
+    make_button(btn_layout, "\U0001f4be Create Ticket", command=save, kind="warning", width=BTN_WIDTH['action'])
+    make_button(btn_layout, "Cancel", command=dlg.reject, kind="secondary", width=BTN_WIDTH['dialog'])
+    content_layout.addWidget(btn_frame)
+
+    dlg.setLayout(content_layout)
+    dlg.exec()

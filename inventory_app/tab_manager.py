@@ -7,16 +7,17 @@ NO hardcoding, NO if/elif branches.
 
 Usage:
     from tab_manager import build_tabs_for_industry
-    build_tabs_for_industry("electronics", notebook, username)
+    build_tabs_for_industry("electronics", tab_widget, username)
 """
 
 import logging
-from tkinter import ttk
+
+from PySide6 import QtWidgets, QtCore, QtGui
 
 logger = logging.getLogger(__name__)
 
 
-def build_tabs_for_industry(industry_id: str, notebook, username: str, role: str = "staff",
+def build_tabs_for_industry(industry_id: str, tab_widget: QtWidgets.QTabWidget, username: str, role: str = "staff",
                            switch_tab_callback=None) -> bool:
     """
     Build ALL tabs for a specific industry based on config.
@@ -45,8 +46,8 @@ def build_tabs_for_industry(industry_id: str, notebook, username: str, role: str
                 if create_func is None:
                     # FALLBACK: Create placeholder tab
                     logger.debug(f"Tab function not found for: {tab_name}, creating placeholder")
-                    frame = _create_placeholder_tab(notebook, tab_name, config.color)
-                    notebook.add(frame, text=f" {tab_name} ")
+                    frame = _create_placeholder_tab(tab_widget, tab_name, config.color)
+                    tab_widget.addTab(frame, f" {tab_name} ")
                     created_tabs.append(tab_name)
                     continue
 
@@ -57,25 +58,25 @@ def build_tabs_for_industry(industry_id: str, notebook, username: str, role: str
 
                 # Determine how to call the function based on its signature
                 if "current_user" in params:
-                    frame = create_func(notebook, current_user=username)
+                    frame = create_func(tab_widget, current_user=username)
                 elif "username" in params and "role" in params:
-                    frame = create_func(notebook, username=username, role=role)
+                    frame = create_func(tab_widget, username=username, role=role)
                 elif "username" in params:
-                    frame = create_func(notebook, username=username)
+                    frame = create_func(tab_widget, username=username)
                 else:
                     # Standard: just parent
-                    frame = create_func(notebook)
+                    frame = create_func(tab_widget)
 
-                # Add to notebook
-                notebook.add(frame, text=f" {tab_name} ")
+                # Add to tab widget
+                tab_widget.addTab(frame, f" {tab_name} ")
                 created_tabs.append(tab_name)
 
             except Exception as e:
                 logger.warning(f"Tab '{tab_name}' failed: {e}, creating placeholder")
                 try:
                     # FALLBACK: Create placeholder tab
-                    frame = _create_placeholder_tab(notebook, tab_name, config.color)
-                    notebook.add(frame, text=f" {tab_name} ")
+                    frame = _create_placeholder_tab(tab_widget, tab_name, config.color)
+                    tab_widget.addTab(frame, f" {tab_name} ")
                     created_tabs.append(tab_name)
                 except Exception as e2:
                     logger.error(f"Failed to create placeholder for '{tab_name}': {e2}")
@@ -95,73 +96,73 @@ def build_tabs_for_industry(industry_id: str, notebook, username: str, role: str
         return False
 
 
-def _create_placeholder_tab(notebook, tab_name: str, color: str = "#3B82F6"):
+def _create_placeholder_tab(tab_widget: QtWidgets.QTabWidget, tab_name: str, color: str = "#3B82F6"):
     """
     Create a placeholder tab when the real function doesn't exist.
     This prevents empty notebooks during industry switching.
     """
-    import tkinter as tk
-    from tkinter import ttk
-    
-    frame = ttk.Frame(notebook, padding=30)
-    
+    frame = QtWidgets.QWidget(tab_widget)
+    layout = QtWidgets.QVBoxLayout(frame)
+    layout.setContentsMargins(30, 30, 30, 30)
+
     # Message card
-    card = ttk.LabelFrame(frame, text=f"{tab_name} - Coming Soon", padding=20)
-    card.pack(fill="both", expand=True, padx=20, pady=20)
-    
-    ttk.Label(
-        card, 
-        text=f"This tab is under development.",
-        font=("Segoe UI", 14)
-    ).pack(pady=(20, 10))
-    
-    ttk.Label(
-        card, 
-        text=f"Industry: {tab_name} features will be available soon.",
-        font=("Segoe UI", 10)
-    ).pack(pady=5)
-    
+    card = QtWidgets.QGroupBox(f"{tab_name} - Coming Soon", frame)
+    card_layout = QtWidgets.QVBoxLayout(card)
+    card_layout.setContentsMargins(20, 20, 20, 20)
+
+    card_layout.addWidget(QtWidgets.QLabel(
+        f"<p style='font-size: 14pt; font-family: Segoe UI;'>This tab is under development.</p>"
+    ))
+
+    card_layout.addWidget(QtWidgets.QLabel(
+        f"<p style='font-size: 10pt; font-family: Segoe UI;'>Industry: {tab_name} features will be available soon.</p>"
+    ))
+
+    card_layout.addStretch()
+    layout.addWidget(card)
+    layout.addStretch()
+
     return frame
 
 
-def reload_tabs_for_new_industry(industry_id: str, notebook, username: str, 
+def reload_tabs_for_new_industry(industry_id: str, tab_widget: QtWidgets.QTabWidget, username: str,
                                 role: str = "staff", switch_tab_callback=None) -> bool:
     """
     Remove all current tabs and rebuild for a new industry.
     Called when user switches industries.
-    
+
     Args:
         industry_id: New industry ID
-        notebook: ttk.Notebook widget
+        tab_widget: QTabWidget widget
         username: Current username
         role: Current user role
         switch_tab_callback: Callback for tab switching
-        
+
     Returns:
         bool: Success status
     """
     try:
         logger.info(f"Switching to industry: {industry_id}")
-        
+
         # 1. Remove ALL existing tabs
-        tab_count = notebook.index("end") + 1
-        for i in range(tab_count):
-            notebook.forget(0)
-        
+        tab_count = tab_widget.count()
+        for i in range(tab_count - 1, -1, -1):
+            tab_widget.removeTab(i)
+
         logger.debug(f"Cleared {tab_count} tabs")
-        
+
         # 2. Build new tabs for the industry
         success = build_tabs_for_industry(
-            industry_id, notebook, username, role, switch_tab_callback
+            industry_id, tab_widget, username, role, switch_tab_callback
         )
-        
+
         if success:
             logger.info(f"✅ Industry switch complete: {industry_id}")
         else:
             logger.error(f"❌ Failed to switch industry: {industry_id}")
-        
+
         return success
-        
+
     except Exception as e:
         logger.error(f"❌ Error during industry switch: {e}")
         return False
@@ -171,10 +172,10 @@ def get_industry_tab_count(industry_id: str) -> int:
     """
     Get number of tabs an industry should have.
     Useful for validation and testing.
-    
+
     Args:
         industry_id: Industry identifier
-        
+
     Returns:
         int: Expected tab count
     """

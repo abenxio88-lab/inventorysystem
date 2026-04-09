@@ -1,10 +1,9 @@
-import tkinter as tk
-from tkinter import messagebox, ttk
+from PySide6 import QtWidgets, QtCore, QtGui
 import logging
 
 from ui_theme import (
     make_button, setup_theme, make_card, styled_label,
-    styled_entry, center_window, FONT_HEADING, FONT_REGULAR,
+    styled_entry, FONT_HEADING, FONT_REGULAR,
     COLOR_TEXT_MUTED, FONT_BOLD, COLOR_APP_BG, COLOR_PRIMARY,
     SUBHEADING_FONT, FONT_SMALL, create_divider, COLOR_TEXT_MAIN,
     COLOR_BORDER, COLOR_PRIMARY_LIGHT
@@ -12,92 +11,164 @@ from ui_theme import (
 from database import verify_user_db
 from utils import get_login_rate_limiter
 
-def open_login(on_success, master=None):
+
+def center_on_screen(dialog):
+    """Center a dialog on the primary screen."""
+    screen = QtWidgets.QApplication.primaryScreen().geometry()
+    dialog_size = dialog.sizeHint()
+    w = max(dialog_size.width(), 550)
+    h = max(dialog_size.height(), 750)
+    dialog.resize(w, h)
+    x = screen.center().x() - w // 2
+    y = screen.center().y() - h // 2
+    dialog.move(x, y)
+
+
+def open_login(on_success, parent=None):
     """
     Creates and displays the premium login window with glassmorphism design.
-    
+
     Args:
         on_success (function): The callback function to execute upon successful login.
-                               It receives `username`, `role`, and `master`.
-        master (tk.Tk, optional): The root window if this is part of a larger app.
-                                  If None, a new Tk root is created.
+                               It receives `username`, `role`, `user_id`, and `master`.
+        parent (QtWidgets.QWidget, optional): The parent window if this is part of
+                                              a larger app.
     """
-    if master is None:
-        login_win = tk.Tk()
-        is_root = True
-    else:
-        login_win = tk.Toplevel(master)
-        is_root = False
+    dialog = QtWidgets.QDialog(parent)
+    dialog.setWindowTitle("Mintaka Sphere - Premium Access")
+    dialog.setMinimumSize(500, 650)
+    dialog.setModal(True)
 
-    login_win.title("Mintaka Sphere - Premium Access")
-    login_win.geometry("550x750")
-    login_win.resizable(True, True)
-    login_win.minsize(500, 650)
-    
     # Configure window background
-    try:
-        login_win.configure(bg=COLOR_APP_BG)
-    except Exception:
-        pass
+    dialog.setStyleSheet(f"QDialog {{ background-color: {COLOR_APP_BG}; }}")
 
-    # --- Main container with premium styling ---
-    main_frame = ttk.Frame(login_win, padding=30)
-    main_frame.pack(fill="both", expand=True)
+    # --- Main layout ---
+    main_layout = QtWidgets.QVBoxLayout(dialog)
+    main_layout.setContentsMargins(30, 30, 30, 30)
+    main_layout.setSpacing(0)
 
     # --- Header section with logo/icon ---
-    header_frame = ttk.Frame(main_frame)
-    header_frame.pack(pady=(20, 30))
-    
+    header_frame = QtWidgets.QWidget()
+    header_layout = QtWidgets.QVBoxLayout(header_frame)
+    header_layout.setContentsMargins(0, 0, 0, 0)
+    header_layout.setSpacing(5)
+
     # Premium icon/emoji display
-    icon_label = styled_label(header_frame, "🔐", font=("Segoe UI", 56))
-    icon_label.pack(pady=(10, 10))
-    
+    icon_label = QtWidgets.QLabel("\U0001F510")
+    icon_label.setFont(QtGui.QFont("Segoe UI", 56))
+    icon_label.setAlignment(QtCore.Qt.AlignCenter)
+    header_layout.addWidget(icon_label)
+
     # Company name with premium typography
-    styled_label(header_frame, "Mintaka Sphere", font=FONT_HEADING, foreground=COLOR_PRIMARY).pack(pady=(5, 5))
-    styled_label(header_frame, "Inventory Management System", font=SUBHEADING_FONT, foreground=COLOR_TEXT_MUTED).pack()
-    
+    title_label = styled_label(header_frame, "Mintaka Sphere", font=FONT_HEADING)
+    title_label.setStyleSheet(f"QLabel {{ color: {COLOR_PRIMARY}; }}")
+    title_label.setAlignment(QtCore.Qt.AlignCenter)
+    header_layout.addWidget(title_label)
+
+    subtitle_label = styled_label(header_frame, "Inventory Management System", font=SUBHEADING_FONT)
+    subtitle_label.setStyleSheet(f"QLabel {{ color: {COLOR_TEXT_MUTED}; }}")
+    subtitle_label.setAlignment(QtCore.Qt.AlignCenter)
+    header_layout.addWidget(subtitle_label)
+
     # Decorative line
-    divider = create_divider(header_frame, orientation="horizontal", color=COLOR_BORDER, thickness=2)
-    divider.pack(fill="x", pady=(20, 20))
+    divider = create_divider(header_frame, orientation="horizontal")
+    divider.setStyleSheet(f"QFrame {{ background-color: {COLOR_BORDER}; }}")
+    header_layout.addWidget(divider)
 
+    # Add spacing around divider
+    header_layout.setSpacing(0)
+    header_layout.insertSpacing(0, 20)  # top padding
+    header_layout.insertSpacing(2, 10)  # between icon and title
+    header_layout.insertSpacing(5, 20)  # below divider
 
-    # --- Login Form Card with Glassmorphism ---
-    card = make_card(main_frame, padx=30, pady=30)
-    card.pack(fill="x", expand=False)
+    main_layout.addWidget(header_frame)
 
-    # Username field with icon
-    username_container = ttk.Frame(card)
-    username_container.pack(fill="x", pady=(0, 20))
-    
-    styled_label(username_container, "Username", font=FONT_BOLD, foreground=COLOR_TEXT_MAIN).pack(anchor="w", pady=(0, 8))
-    username_entry = styled_entry(username_container)
-    username_entry.pack(fill="x", ipady=8)
-    username_entry.insert(0, "")  # Placeholder behavior can be enhanced
+    # --- Login Form Card ---
+    card = make_card(main_frame := QtWidgets.QWidget(), padding=30)
+    card_layout = QtWidgets.QVBoxLayout(card)
+    card_layout.setSpacing(15)
 
-    # Password field with icon
-    password_container = ttk.Frame(card)
-    password_container.pack(fill="x", pady=(0, 25))
-    
-    styled_label(password_container, "Password", font=FONT_BOLD, foreground=COLOR_TEXT_MAIN).pack(anchor="w", pady=(0, 8))
-    password_entry = styled_entry(password_container, show="•")
-    password_entry.pack(fill="x", ipady=8)
+    # Username field
+    username_label = styled_label(card, "Username", font=FONT_BOLD)
+    username_label.setStyleSheet(f"QLabel {{ color: {COLOR_TEXT_MAIN}; }}")
+    card_layout.addWidget(username_label)
 
-    def login(event=None):
+    username_entry = styled_entry(card)
+    username_entry.setMinimumHeight(40)
+    card_layout.addWidget(username_entry)
+
+    # Password field with visibility toggle
+    password_label = styled_label(card, "Password", font=FONT_BOLD)
+    password_label.setStyleSheet(f"QLabel {{ color: {COLOR_TEXT_MAIN}; }}")
+    card_layout.addWidget(password_label)
+
+    password_row = QtWidgets.QWidget()
+    password_row_layout = QtWidgets.QHBoxLayout(password_row)
+    password_row_layout.setContentsMargins(0, 0, 0, 0)
+    password_row_layout.setSpacing(8)
+
+    password_entry = styled_entry(password_row)
+    password_entry.setMinimumHeight(40)
+    password_entry.setEchoMode(QtWidgets.QLineEdit.Password)
+    password_row_layout.addWidget(password_entry)
+
+    # Password visibility toggle button
+    toggle_btn = QtWidgets.QPushButton("\U0001F441")
+    toggle_btn.setFixedSize(40, 40)
+    toggle_btn.setCursor(QtCore.Qt.PointingHandCursor)
+    toggle_btn.setStyleSheet(f"""
+        QPushButton {{
+            background-color: {COLOR_APP_BG};
+            border: 1px solid {COLOR_BORDER};
+            border-radius: 8px;
+            font-size: 16px;
+        }}
+        QPushButton:hover {{
+            border-color: {COLOR_PRIMARY};
+        }}
+    """)
+    password_row_layout.addWidget(toggle_btn)
+
+    password_visible = False
+
+    def toggle_password_visibility():
+        nonlocal password_visible
+        password_visible = not password_visible
+        if password_visible:
+            password_entry.setEchoMode(QtWidgets.QLineEdit.Normal)
+            toggle_btn.setText("\U0001F441\u200D\U0001F5E8")
+        else:
+            password_entry.setEchoMode(QtWidgets.QLineEdit.Password)
+            toggle_btn.setText("\U0001F441")
+
+    toggle_btn.clicked.connect(toggle_password_visibility)
+
+    card_layout.addWidget(password_row)
+
+    # Login button
+    def do_login():
         """Handles the login logic using database authentication with rate limiting."""
-        username = username_entry.get().strip()
-        password = password_entry.get()
+        username = username_entry.text().strip()
+        password = password_entry.text()
 
         if not username or not password:
-            messagebox.showwarning("Input Required", "Please enter both username and password.")
+            QtWidgets.QMessageBox.warning(
+                dialog,
+                "Input Required",
+                "Please enter both username and password."
+            )
             return
 
         # Check rate limiting
         rate_limiter = get_login_rate_limiter()
         if not rate_limiter.is_allowed(username):
             wait_time = rate_limiter.get_wait_time(username)
-            messagebox.showerror("Too Many Attempts",
-                               f"Too many failed login attempts for '{username}'.\n"
-                               f"Please wait {wait_time} seconds before trying again.")
+            QtWidgets.QMessageBox.critical(
+                dialog,
+                "Too Many Attempts",
+                f"Too many failed login attempts for '{username}'.\n"
+                f"Please wait {wait_time} seconds before trying again."
+            )
             return
 
         # Authenticate against database
@@ -105,54 +176,63 @@ def open_login(on_success, master=None):
         if success:
             logging.info(f"Login successful for user: {username}")
             rate_limiter.reset(username)  # Reset counter on success
-            login_win.destroy()
-            on_success(username, role, user_id, master)
+            dialog.accept()
+            on_success(username, role, user_id, parent)
         else:
             logging.warning(f"Login failed for user: {username}")
             rate_limiter.record_attempt(username)
             remaining = rate_limiter.get_remaining_attempts(username)
             if remaining is not None and remaining <= 0:
-                messagebox.showerror("Account Locked",
-                                   f"Account '{username}' has been locked due to too many failed attempts.\n"
-                                   f"Please wait before trying again.")
+                QtWidgets.QMessageBox.critical(
+                    dialog,
+                    "Account Locked",
+                    f"Account '{username}' has been locked due to too many failed attempts.\n"
+                    f"Please wait before trying again."
+                )
             else:
                 msg = "Invalid username or password"
                 if remaining is not None:
                     msg += f"\n({remaining} attempts remaining before lockout)"
-                messagebox.showerror("Login Failed", msg)
-            password_entry.delete(0, tk.END)
+                QtWidgets.QMessageBox.critical(dialog, "Login Failed", msg)
+            password_entry.clear()
+            password_entry.setFocus()
 
-    # --- Premium Login Button ---
-    login_btn = make_button(card, text="SIGN IN", command=login, kind="primary", icon="🚀")
-    login_btn.pack(fill="x", ipady=12, pady=(10, 0))
+    login_btn = make_button(card, text="SIGN IN", slot=do_login, kind="primary")
+    login_btn.setMinimumHeight(44)
+    card_layout.addWidget(login_btn)
 
-    # --- Helper text ---
-    helper_frame = ttk.Frame(card)
-    helper_frame.pack(fill="x", pady=(15, 0))
-    
-    help_text = styled_label(helper_frame, "Need help? Contact your administrator", 
-                            font=FONT_SMALL, foreground=COLOR_TEXT_MUTED)
-    help_text.pack(anchor="center")
+    # Helper text
+    help_text = styled_label(card, "Need help? Contact your administrator", font=FONT_SMALL)
+    help_text.setStyleSheet(f"QLabel {{ color: {COLOR_TEXT_MUTED}; }}")
+    help_text.setAlignment(QtCore.Qt.AlignCenter)
+    card_layout.addWidget(help_text)
+
+    # Add spacer to push content up
+    card_layout.addStretch()
+
+    main_layout.addWidget(card)
 
     # --- Bindings ---
-    username_entry.bind('<Return>', lambda e: password_entry.focus())
-    password_entry.bind('<Return>', login)
+    username_entry.returnPressed.connect(lambda: password_entry.setFocus())
+    password_entry.returnPressed.connect(do_login)
 
-    # --- Finalize Window ---
-    center_window(login_win)
-    login_win.deiconify()
-    login_win.lift()
-    login_win.focus_force()
-    username_entry.focus_set()
+    # --- Center and show dialog ---
+    center_on_screen(dialog)
+    username_entry.setFocus()
 
-    if is_root:
-        login_win.mainloop()
+    return dialog
+
 
 if __name__ == '__main__':
     # This allows the login UI to be tested standalone
-    root = tk.Tk()
-    root.withdraw()
-    setup_theme(root, "superhero")
-    open_login(lambda u, r, m: print(f"Login successful for {u} ({r})"))
-    root.mainloop()
+    import sys
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
+    setup_theme(None, "superhero")
 
+    def on_login_success(username, role, user_id, master):
+        print(f"Login successful for {username} ({role}), user_id={user_id}")
+        app.quit()
+
+    dlg = open_login(on_login_success)
+    dlg.exec()
+    sys.exit()

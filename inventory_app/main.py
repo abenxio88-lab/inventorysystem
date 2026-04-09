@@ -1,7 +1,7 @@
 """
 Mintaka Sphere - Main Entry Point
 ==================================
-Industrial-grade inventory management system.
+Industrial-grade inventory management system (PySide6).
 """
 import sys
 import os
@@ -10,8 +10,7 @@ import threading
 import importlib
 import inspect
 
-import tkinter as tk
-from tkinter import ttk, messagebox
+from PySide6 import QtWidgets, QtCore, QtGui
 
 # ---------------------------------------------------------------------------
 # Path setup (must run before any local imports)
@@ -26,7 +25,7 @@ if current_dir not in sys.path:
 from app_core import app_state
 from ui_theme import (
     setup_theme, toggle_theme, get_color, make_button, styled_label,
-    center_window, FONT_HEADING, FONT_SMALL, COLOR_PRIMARY, COLOR_TEXT_MUTED,
+    FONT_HEADING, FONT_SMALL, COLOR_PRIMARY, COLOR_TEXT_MUTED,
     label, frame,
 )
 
@@ -52,10 +51,10 @@ def reload_industry_tabs() -> bool:
     """
     try:
         from database import db
-        
+
         # Get current industry from DB
         industry_id = db.get_industry_type()
-        
+
         # Remove ALL tabs and rebuild from config
         return reload_tabs_for_new_industry(
             industry_id,
@@ -106,151 +105,366 @@ report_info("Industrial Core starting up...", module="Main")
 
 
 # ============================================================================
+# Helper utilities
+# ============================================================================
+
+def center_window_on_screen(widget, width, height):
+    """Center a QWidget on the primary screen."""
+    widget.resize(width, height)
+    screen = QtWidgets.QApplication.primaryScreen().geometry()
+    x = (screen.width() - width) // 2
+    y = (screen.height() - height) // 2
+    widget.move(x, y)
+
+
+# ============================================================================
 # Dashboard builder
 # ============================================================================
 
-def build_dashboard(root, username, role):
-    """Build the main application dashboard after login."""
-    logging.info("Building dashboard contents for %s", username)
+class DashboardBuilder:
+    """Builds and manages the main application dashboard."""
 
-    # ── Core frame ──────────────────────────────────────────────────────
-    app_container = ttk.Frame(root)
-    app_container.pack(fill="both", expand=True)
+    def __init__(self, main_window, username, role):
+        self.main_window = main_window
+        self.username = username
+        self.role = role
+        self.central_widget = None
+        self.top_bar_layout = None
+        self.stats_var = None
+        self.notebook = None
+        self.stats_timer = None
+        self._stats_running = True
 
-    # ── Top bar ─────────────────────────────────────────────────────────
-    top_bar = tk.Frame(app_container, bg=get_color("app_bg"), height=60)
-    top_bar.pack(fill="x", side="top", padx=20, pady=10)
+    def build(self):
+        """Build the complete dashboard UI."""
+        logging.info("Building dashboard contents for %s", self.username)
 
-    label(top_bar, "MINTAKA SPHERE", kind="heading", foreground=COLOR_PRIMARY).pack(side="left")
+        # ── Central widget ──────────────────────────────────────────────
+        self.central_widget = QtWidgets.QWidget(self.main_window)
+        self.main_window.setCentralWidget(self.central_widget)
 
-    action_frame = tk.Frame(top_bar, bg=get_color("app_bg"))
-    action_frame.pack(side="right")
+        main_layout = QtWidgets.QVBoxLayout(self.central_widget)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
 
-    stats_var = tk.StringVar(value="Loading stats...")
-    styled_label(
-        action_frame, textvariable=stats_var,
-        font=FONT_SMALL, foreground=COLOR_TEXT_MUTED,
-    ).pack(side="left", padx=20)
+        # ── Top bar ─────────────────────────────────────────────────────
+        self._build_top_bar(main_layout)
 
-    # ── Industry switcher dialog ────────────────────────────────────────
-    def on_industry_switch():
+        # ── Notebook (tab container) ────────────────────────────────────
+        self._build_notebook(main_layout)
+
+        # ── Status Bar (bottom of window) ──────────────────────────────
+        self._build_status_bar()
+
+        # ── Keyboard Shortcuts ─────────────────────────────────────────
+        self._bind_shortcuts()
+
+        # ── Periodic stats ticker ──────────────────────────────────────
+        self._start_stats_ticker()
+
+    def _build_top_bar(self, parent_layout):
+        """Build the top action bar."""
+        top_bar = QtWidgets.QWidget(self.central_widget)
+        top_bar.setFixedHeight(60)
+        top_bar.setStyleSheet(f"background-color: {get_color('app_bg')};")
+
+        top_layout = QtWidgets.QHBoxLayout(top_bar)
+        top_layout.setContentsMargins(20, 10, 20, 10)
+        top_layout.setSpacing(8)
+
+        # Title label
+        title_lbl = QtWidgets.QLabel("MINTAKA SPHERE", top_bar)
+        title_lbl.setFont(QtGui.QFont(FONT_HEADING[0], FONT_HEADING[1]))
+        title_lbl.setStyleSheet(f"color: {COLOR_PRIMARY}; font-weight: 700;")
+        top_layout.addWidget(title_lbl)
+
+        top_layout.addStretch()
+
+        # Stats label
+        self.stats_lbl = styled_label(
+            top_bar, text="Loading stats...",
+        )
+        self.stats_lbl.setFont(QtGui.QFont(FONT_SMALL[0], FONT_SMALL[1]))
+        self.stats_lbl.setStyleSheet(f"color: {COLOR_TEXT_MUTED};")
+        top_layout.addWidget(self.stats_lbl)
+
+        # Industry switcher dialog
+        def on_industry_switch():
+            try:
+                from industry_selector import create_industry_selector_card
+            except ImportError:
+                QtWidgets.QMessageBox.critical(
+                    self.main_window, "Error", "Industry selector not available."
+                )
+                return
+
+            switch_win = QtWidgets.QDialog(self.main_window)
+            switch_win.setWindowTitle("Business Mode Selection")
+            center_window_on_screen(switch_win, 800, 600)
+
+            def handle_change(new_id):
+                switch_win.close()
+                from industry_service import get_config
+                cfg = get_config(new_id)
+                QtWidgets.QMessageBox.information(
+                    self.main_window,
+                    "Mode Updated",
+                    f"System operating mode changed to: {cfg['name']}\n"
+                    f"All tabs and forms updated.",
+                )
+
+            card = create_industry_selector_card(
+                switch_win, on_industry_changed=handle_change,
+            )
+            dlg_layout = QtWidgets.QVBoxLayout(switch_win)
+            dlg_layout.setContentsMargins(20, 20, 20, 20)
+            dlg_layout.addWidget(card)
+            switch_win.exec()
+
+        # Action buttons
+        btn_quick = make_button(top_bar, "Quick Item", kind="primary")
+        btn_quick.clicked.connect(lambda: self.switch_tab("Inventory"))
+        top_layout.addWidget(btn_quick)
+
+        btn_mode = make_button(top_bar, "Mode", kind="secondary")
+        btn_mode.clicked.connect(on_industry_switch)
+        top_layout.addWidget(btn_mode)
+
+        btn_theme = make_button(top_bar, "Theme", kind="secondary")
+        btn_theme.clicked.connect(lambda: toggle_theme(self.main_window))
+        top_layout.addWidget(btn_theme)
+
+        btn_logout = make_button(top_bar, "Logout", kind="danger")
+        btn_logout.clicked.connect(self.main_window.close)
+        top_layout.addWidget(btn_logout)
+
+        parent_layout.addWidget(top_bar)
+
+    def _build_notebook(self, parent_layout):
+        """Build the tab notebook and populate tabs."""
+        self.notebook = QtWidgets.QTabWidget(self.central_widget)
+
+        # Store references for the rest of the app
+        app_state.main_notebook = self.notebook
+        app_state.username = self.username
+        app_state.role = self.role
+        app_state.switch_tab = self.switch_tab
+
+        # Build ALL tabs from config (ELECTRONICS is default)
         try:
-            from industry_selector import create_industry_selector_card
-        except ImportError:
-            messagebox.showerror("Error", "Industry selector not available.")
-            return
+            from tab_manager import build_tabs_for_industry
+            from config import get_default_industry
 
-        switch_win = tk.Toplevel(root)
-        switch_win.title("Business Mode Selection")
-        center_window(switch_win, 800, 600)
+            industry_id = get_default_industry()
 
-        def handle_change(new_id):
-            switch_win.destroy()
-            from industry_service import get_config
-            cfg = get_config(new_id)
-            messagebox.showinfo(
-                "Mode Updated",
-                f"System operating mode changed to: {cfg['name']}\n"
-                f"All tabs and forms updated.",
+            success = build_tabs_for_industry(
+                industry_id, self.notebook, self.username, self.role,
+                switch_tab_callback=self.switch_tab
             )
 
-        create_industry_selector_card(
-            switch_win, on_industry_changed=handle_change,
-        ).pack(fill="both", expand=True, padx=20, pady=20)
+            if not success:
+                logging.error("Failed to build tabs from config")
 
-    # ── Top-bar buttons ─────────────────────────────────────────────────
-    make_button(
-        action_frame, "➕ Quick Item",
-        command=lambda: switch_tab("Inventory"), kind="primary",
-    ).pack(side="left", padx=5)
-    make_button(
-        action_frame, "🔄 Mode",
-        command=on_industry_switch, kind="secondary",
-    ).pack(side="left", padx=5)
-    make_button(
-        action_frame, "🌓 Theme",
-        command=lambda: toggle_theme(root), kind="secondary",
-    ).pack(side="left", padx=5)
-    make_button(
-        action_frame, "🚪 Logout",
-        command=root.destroy, kind="danger",
-    ).pack(side="left", padx=5)
+        except Exception as exc:
+            logging.error("Tab building failed: %s", exc)
 
-    # ── Notebook (tab container) ────────────────────────────────────────
-    notebook = ttk.Notebook(app_container)
-    notebook.pack(fill="both", expand=True, padx=15, pady=(0, 15))
+        parent_layout.addWidget(self.notebook)
 
-    def switch_tab(target_text):
-        for i in range(notebook.index("end")):
-            if target_text.lower() in notebook.tab(i, "text").lower():
-                notebook.select(i)
+    def _build_status_bar(self):
+        """Build the status bar at the bottom."""
+        try:
+            from status_widget import create_status_bar
+            status_bar = create_status_bar(self.main_window, "Mintaka Sphere IMS")
+            self.main_window.statusBar().addWidget(status_bar)
+        except Exception as exc:
+            logging.warning("Failed to load status bar: %s", exc)
+
+    def _bind_shortcuts(self):
+        """Bind keyboard shortcuts."""
+        try:
+            from business_settings import bind_industry_shortcut
+            bind_industry_shortcut(self.main_window, dashboard_frame=None)
+        except Exception as exc:
+            logging.warning("Failed to bind Ctrl+I shortcut: %s", exc)
+
+    def switch_tab(self, target_text):
+        """Switch to a tab whose title contains target_text."""
+        for i in range(self.notebook.count()):
+            tab_text = self.notebook.tabText(i)
+            if target_text.lower() in tab_text.lower():
+                self.notebook.setCurrentIndex(i)
                 return True
         return False
 
-    # Store references for the rest of the app
-    app_state.main_notebook = notebook
-    app_state.username = username
-    app_state.role = role
-    app_state.switch_tab = switch_tab
+    def _start_stats_ticker(self):
+        """Start periodic stats updates using QTimer."""
+        self.stats_timer = QtCore.QTimer(self.main_window)
+        self.stats_timer.timeout.connect(self._update_stats)
+        self.stats_timer.start(30000)  # Every 30 seconds
+        self._update_stats()  # Initial call
 
-    # ── Build ALL tabs from config (ELECTRONICS is default) ─────────
-    try:
-        from tab_manager import build_tabs_for_industry
-        from config import get_default_industry
-        
-        # Get default industry (Electronics)
-        industry_id = get_default_industry()
-        
-        # Build all tabs based on industry config
-        success = build_tabs_for_industry(
-            industry_id, notebook, username, role,
-            switch_tab_callback=app_state.switch_tab
-        )
-        
-        if not success:
-            logging.error("Failed to build tabs from config")
-            
-    except Exception as exc:
-        logging.error("Tab building failed: %s", exc)
-
-    # ── Status Bar (bottom of window) ──────────────────────────────────
-    try:
-        from status_widget import create_status_bar
-        status_bar = create_status_bar(root, "Mintaka Sphere IMS")
-        status_bar.pack(fill="x", side="bottom")
-    except Exception as exc:
-        logging.warning("Failed to load status bar: %s", exc)
-
-    # ── Keyboard Shortcuts ─────────────────────────────────────────────
-    try:
-        from business_settings import bind_industry_shortcut
-        bind_industry_shortcut(root, dashboard_frame=None)
-    except Exception as exc:
-        logging.warning("Failed to bind Ctrl+I shortcut: %s", exc)
-
-    # ── Periodic stats ticker ───────────────────────────────────────────
-    _stats_running = True
-
-    def update_stats():
-        """Robust periodic stats updater with proper error handling."""
-        if not _stats_running or not root.winfo_exists():
+    def _update_stats(self):
+        """Update stats label with current database stats."""
+        if not self._stats_running:
             return
-        
+
         try:
             stats = get_db_stats()
             low = stats.get("low_stock_count", 0)
             tot = stats.get("total_products", 0)
-            if root.winfo_exists():
-                stats_var.set(f"\u26a0\ufe0f Low Stock: {low} | Products: {tot}")
+            if hasattr(self, 'stats_lbl') and self.stats_lbl is not None:
+                self.stats_lbl.setText(f"\u26a0\ufe0f Low Stock: {low} | Products: {tot}")
         except Exception as exc:
             logging.debug("Stats update failed: %s", exc)
-            if root.winfo_exists():
-                stats_var.set("Stats unavailable")
-        finally:
-            if _stats_running and root.winfo_exists():
-                root.after(30000, update_stats)
+            if hasattr(self, 'stats_lbl') and self.stats_lbl is not None:
+                self.stats_lbl.setText("Stats unavailable")
 
-    update_stats()
+    def stop_stats_timer(self):
+        """Stop the stats update timer."""
+        self._stats_running = False
+        if self.stats_timer is not None:
+            self.stats_timer.stop()
+
+
+# ============================================================================
+# Main application class
+# ============================================================================
+
+class MintakaSphereApp:
+    """Main application controller for Mintaka Sphere IMS."""
+
+    def __init__(self):
+        self.app = None
+        self.main_window = None
+        self.dashboard = None
+
+    def run(self):
+        """Run the application."""
+        try:
+            # Create Qt application
+            self.app = QtWidgets.QApplication.instance()
+            if self.app is None:
+                self.app = QtWidgets.QApplication(sys.argv)
+
+            # 1. Database
+            init_database()
+            migrate_database()
+            ensure_default_admin()
+
+            # 2. One-time JSON user migration
+            try:
+                count = migrate_json_users_to_db()
+                if count > 0:
+                    report_info(f"Migrated {count} users from JSON to database", module="Auth")
+            except Exception as exc:
+                logging.warning("User migration failed: %s", exc)
+
+            # 3. Create main window (hidden initially)
+            self.main_window = QtWidgets.QMainWindow()
+            self.main_window.hide()
+
+            # Setup theme
+            setup_theme(self.main_window, is_dark=(get_color("text_main") == "#FFFFFF"))
+
+            # 4. Show login
+            self._show_login()
+
+            # 5. Start event loop
+            sys.exit(self.app.exec())
+
+        except Exception as exc:
+            report_error("Critical application crash during startup", exception=exc, module="Main")
+            try:
+                QtWidgets.QMessageBox.critical(
+                    None,
+                    "Critical Error",
+                    f"The application failed to start:\n{exc}\n\nCheck 'app.log' for details.",
+                )
+            except Exception:
+                print(f"CRITICAL ERROR: {exc}")
+
+    def _show_login(self):
+        """Show the login dialog."""
+        def on_login_success(username, role, user_id, login_win=None):
+            self._on_login_success(username, role, user_id)
+
+        # open_login is a tkinter-based dialog - needs conversion separately
+        # For now, this call expects the tkinter version
+        open_login(on_success=on_login_success, master=self.main_window)
+
+    def _on_login_success(self, username, role, user_id):
+        """Handle successful login and build dashboard."""
+        self.main_window.setWindowTitle(f"Mintaka Sphere IMS - {username.upper()}")
+        center_window_on_screen(self.main_window, 1400, 900)
+        self.main_window.show()
+
+        # Build dashboard
+        self.dashboard = DashboardBuilder(self.main_window, username, role)
+        self.dashboard.build()
+
+        app_state.user_id = user_id
+        report_info(f"User {username} logged in successfully (ID: {user_id}).", module="Auth")
+
+        # Start background services
+        self._start_services()
+
+        # Connect close event for graceful shutdown
+        self.main_window.closeEvent = self._on_closing
+
+    def _start_services(self):
+        """Start connectivity monitor, sync engine, and backup."""
+        try:
+            connectivity_monitor.start()
+            report_info("Connectivity monitor started", module="Main")
+        except Exception as exc:
+            logging.warning("Failed to start connectivity monitor: %s", exc)
+
+        try:
+            if sync_engine:
+                sync_engine.start()
+                report_info("Sync engine started", module="Main")
+        except Exception as exc:
+            logging.warning("Failed to start sync engine: %s", exc)
+
+        try:
+            if backup_manager:
+                def run_backup():
+                    try:
+                        backup_manager.create_backup(backup_type="auto")
+                        report_info("Initial backup completed", module="Main")
+                    except Exception as exc:
+                        logging.warning("Backup failed: %s", exc)
+
+                threading.Thread(target=run_backup, daemon=True).start()
+        except Exception as exc:
+            logging.warning("Failed to start backup: %s", exc)
+
+    def _on_closing(self, event):
+        """Handle graceful application shutdown."""
+        report_info("Application shutting down...", module="Main")
+
+        # Stop stats timer
+        if self.dashboard is not None:
+            self.dashboard.stop_stats_timer()
+
+        try:
+            connectivity_monitor.stop()
+        except Exception as exc:
+            logging.error("Error stopping connectivity monitor: %s", exc)
+
+        try:
+            if sync_engine:
+                sync_engine.stop()
+        except Exception as exc:
+            logging.error("Error stopping sync engine: %s", exc)
+
+        try:
+            close_connection()
+        except Exception as exc:
+            logging.error("Error closing database: %s", exc)
+
+        # Accept the close event
+        event.accept()
 
 
 # ============================================================================
@@ -259,100 +473,8 @@ def build_dashboard(root, username, role):
 
 def main():
     """Industrial-grade main entry point."""
-    try:
-        # 1. Database
-        init_database()
-        migrate_database()
-        ensure_default_admin()
-
-        # 2. One-time JSON user migration
-        try:
-            count = migrate_json_users_to_db()
-            if count > 0:
-                report_info(f"Migrated {count} users from JSON to database", module="Auth")
-        except Exception as exc:
-            logging.warning("User migration failed: %s", exc)
-
-        # 3. UI
-        root = tk.Tk()
-        root.withdraw()
-        setup_theme(root, is_dark=(get_color("text_main") == "#FFFFFF"))
-
-        def on_login_success(username, role, user_id, login_win=None):
-            root.title(f"Mintaka Sphere IMS - {username.upper()}")
-            root.geometry("1400x900")
-            center_window(root, 1400, 900)
-            root.deiconify()
-
-            build_dashboard(root, username, role)
-            app_state.user_id = user_id
-            report_info(f"User {username} logged in successfully (ID: {user_id}).", module="Auth")
-
-            # Start background services
-            try:
-                connectivity_monitor.start()
-                report_info("Connectivity monitor started", module="Main")
-            except Exception as exc:
-                logging.warning("Failed to start connectivity monitor: %s", exc)
-
-            try:
-                if sync_engine:
-                    sync_engine.start()
-                    report_info("Sync engine started", module="Main")
-            except Exception as exc:
-                logging.warning("Failed to start sync engine: %s", exc)
-
-            # Run backup in background thread to prevent UI freeze
-            try:
-                if backup_manager:
-                    def run_backup():
-                        try:
-                            backup_manager.create_backup(backup_type="auto")
-                            report_info("Initial backup completed", module="Main")
-                        except Exception as exc:
-                            logging.warning("Backup failed: %s", exc)
-                    
-                    threading.Thread(target=run_backup, daemon=True).start()
-            except Exception as exc:
-                logging.warning("Failed to start backup: %s", exc)
-
-            # Graceful shutdown
-            def on_closing():
-                report_info("Application shutting down...", module="Main")
-
-                try:
-                    connectivity_monitor.stop()
-                except Exception as exc:
-                    logging.error("Error stopping connectivity monitor: %s", exc)
-
-                try:
-                    if sync_engine:
-                        sync_engine.stop()
-                except Exception as exc:
-                    logging.error("Error stopping sync engine: %s", exc)
-
-                try:
-                    close_connection()
-                except Exception as exc:
-                    logging.error("Error closing database: %s", exc)
-
-                root.destroy()
-
-            root.protocol("WM_DELETE_WINDOW", on_closing)
-
-        open_login(on_success=on_login_success, master=root)
-        root.mainloop()
-
-    except Exception as exc:
-        report_error("Critical application crash during startup", exception=exc, module="Main")
-        # Final fallback — print to console when GUI itself has failed
-        try:
-            messagebox.showerror(
-                "Critical Error",
-                f"The application failed to start:\n{exc}\n\nCheck 'app.log' for details.",
-            )
-        except Exception:
-            print(f"CRITICAL ERROR: {exc}")
+    app = MintakaSphereApp()
+    app.run()
 
 
 if __name__ == "__main__":

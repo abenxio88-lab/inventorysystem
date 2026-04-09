@@ -5,8 +5,7 @@ Complete purchase order management system.
 Create POs, track status, receive goods, and manage supplier orders.
 """
 
-import tkinter as tk
-from tkinter import ttk, messagebox
+from PySide6 import QtWidgets, QtCore, QtGui
 import logging
 from datetime import datetime, timedelta
 
@@ -23,40 +22,51 @@ def create_purchase_orders_tab(parent, current_user=None):
     """
     Creates the purchase orders management tab.
     """
-    window = ttk.Frame(parent, padding=15)
+    window = QtWidgets.QWidget()
+    main_layout = QtWidgets.QVBoxLayout(window)
+    main_layout.setContentsMargins(15, 15, 15, 15)
+    main_layout.setSpacing(10)
 
     # Header
-    header_frame = ttk.Frame(window)
-    header_frame.pack(fill="x", pady=(0, 15))
-
-    styled_label(header_frame, "📦 Purchase Orders", font=FONT_BOLD).pack(side=tk.LEFT)
+    header_frame = QtWidgets.QWidget()
+    header_layout = QtWidgets.QHBoxLayout(header_frame)
+    header_layout.setContentsMargins(0, 0, 0, 15)
+    styled_label(header_frame, "Purchase Orders", font=FONT_BOLD)
+    header_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft)
+    main_layout.addWidget(header_frame)
 
     # New PO button
     def open_new_po():
         open_create_po_dialog(window, current_user=current_user)
 
-    make_button(header_frame, "➕ New Purchase Order", command=open_new_po, kind="success").pack(side=tk.RIGHT)
+    new_btn = make_button(header_frame, "New Purchase Order", command=open_new_po, kind="success")
+    header_layout.addStretch()
+    header_layout.addWidget(new_btn)
 
     # Summary cards
-    summary_frame = ttk.Frame(window)
-    summary_frame.pack(fill="x", pady=(0, 15))
-    summary_frame.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
+    summary_frame = QtWidgets.QWidget()
+    summary_layout = QtWidgets.QHBoxLayout(summary_frame)
+    summary_layout.setContentsMargins(0, 0, 0, 15)
+    summary_layout.setSpacing(8)
+    main_layout.addWidget(summary_frame)
 
-    def create_summary_card(parent, title, value, col):
+    def create_summary_card(parent, title, value):
         card = make_card(parent, padding=12)
-        card.grid(row=0, column=col, padx=8, sticky="nsew")
-
-        styled_label(card, text=title, font=("Segoe UI", 9), foreground="#6c757d").pack(anchor="w")
+        card_layout = QtWidgets.QVBoxLayout(card)
+        card_layout.setContentsMargins(8, 8, 8, 8)
+        title_lbl = styled_label(card, text=title, font=("Segoe UI", 9), foreground="#6c757d")
+        card_layout.addWidget(title_lbl)
         value_label = styled_label(card, text=str(value), font=("Segoe UI", 20, "bold"), foreground=COLOR_PRIMARY)
-        value_label.pack(anchor="w", pady=(3, 0))
-
+        card_layout.addWidget(value_label)
+        card_layout.addStretch()
+        summary_layout.addWidget(card)
         return value_label
 
-    draft_lbl = create_summary_card(summary_frame, "Draft", 0, 0)
-    sent_lbl = create_summary_card(summary_frame, "Sent", 0, 1)
-    confirmed_lbl = create_summary_card(summary_frame, "Confirmed", 0, 2)
-    received_lbl = create_summary_card(summary_frame, "Received", 0, 3)
-    total_lbl = create_summary_card(summary_frame, "Total POs", 0, 4)
+    draft_lbl = create_summary_card(summary_frame, "Draft", 0)
+    sent_lbl = create_summary_card(summary_frame, "Sent", 0)
+    confirmed_lbl = create_summary_card(summary_frame, "Confirmed", 0)
+    received_lbl = create_summary_card(summary_frame, "Received", 0)
+    total_lbl = create_summary_card(summary_frame, "Total POs", 0)
 
     window.summary_labels = {
         'draft': draft_lbl,
@@ -67,45 +77,41 @@ def create_purchase_orders_tab(parent, current_user=None):
     }
 
     # Filter toolbar
-    toolbar_frame = ttk.Frame(window)
-    toolbar_frame.pack(fill="x", pady=(0, 10))
+    toolbar_frame = QtWidgets.QWidget()
+    toolbar_layout = QtWidgets.QHBoxLayout(toolbar_frame)
+    toolbar_layout.setContentsMargins(0, 0, 0, 10)
+    main_layout.addWidget(toolbar_frame)
 
-    styled_label(toolbar_frame, "Status:").pack(side=tk.LEFT, padx=(0, 10))
+    styled_label(toolbar_frame, "Status:")
+    status_combo = QtWidgets.QComboBox()
+    status_combo.addItems(["all", "draft", "sent", "confirmed", "partial", "received", "cancelled"])
+    toolbar_layout.addWidget(status_combo)
 
-    status_var = tk.StringVar(value="all")
-    status_combo = ttk.Combobox(
-        toolbar_frame,
-        textvariable=status_var,
-        values=["all", "draft", "sent", "confirmed", "partial", "received", "cancelled"],
-        state="readonly",
-        width=15
-    )
-    status_combo.pack(side=tk.LEFT, padx=5)
-
-    styled_label(toolbar_frame, "Supplier:").pack(side=tk.LEFT, padx=(15, 5))
-
-    supplier_var = tk.StringVar(value="all")
-    supplier_combo = ttk.Combobox(toolbar_frame, textvariable=supplier_var, state="readonly", width=20)
-    supplier_combo.pack(side=tk.LEFT, padx=5)
+    styled_label(toolbar_frame, "Supplier:")
+    supplier_combo = QtWidgets.QComboBox()
+    toolbar_layout.addWidget(supplier_combo)
 
     # Load suppliers
     suppliers = svc.supplier.get_all_suppliers()
     supplier_data = [("all", "All Suppliers")] + [(s['id'], f"{s['code']} - {s['name']}") for s in suppliers]
-    supplier_combo['values'] = [s[1] for s in supplier_data]
+    supplier_combo.addItems([s[1] for s in supplier_data])
 
     def apply_filter():
         refresh_from_db()
 
-    make_button(toolbar_frame, "Apply", command=apply_filter, kind="primary").pack(side=tk.LEFT, padx=10)
-    make_button(toolbar_frame, "Clear", command=lambda: (status_var.set("all"), supplier_var.set("all"), refresh_from_db()), kind="secondary").pack(side=tk.LEFT)
+    apply_btn = make_button(toolbar_frame, "Apply", command=apply_filter, kind="primary")
+    toolbar_layout.addWidget(apply_btn)
+    clear_btn = make_button(toolbar_frame, "Clear", command=lambda: (status_combo.setCurrentText("all"), supplier_combo.setCurrentText("All Suppliers"), refresh_from_db()), kind="secondary")
+    toolbar_layout.addWidget(clear_btn)
+    toolbar_layout.addStretch()
 
     # PO table
     table_frame = make_card(window, padding=10)
-    table_frame.pack(fill="both", expand=True)
+    table_layout = QtWidgets.QHBoxLayout(table_frame)
+    table_layout.setContentsMargins(0, 0, 0, 0)
+    main_layout.addWidget(table_frame)
 
     columns = ("po_number", "supplier", "order_date", "expected_date", "status", "total_amount", "items")
-    tree = ttk.Treeview(table_frame, columns=columns, show="headings")
-
     column_map = {
         "po_number": ("PO Number", 120),
         "supplier": ("Supplier", 200),
@@ -116,57 +122,67 @@ def create_purchase_orders_tab(parent, current_user=None):
         "items": ("Items", 60)
     }
 
-    for col, (label_text, width) in column_map.items():
-        tree.heading(col, text=label_text, anchor="w")
-        tree.column(col, width=width, anchor="w", minwidth=80)
+    tree = QtWidgets.QTableWidget()
+    tree.setColumnCount(len(columns))
+    tree.setHorizontalHeaderLabels([column_map[c][0] for c in columns])
+    tree.horizontalHeader().setStretchLastSection(True)
+    tree.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Interactive)
+    tree.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+    tree.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
 
-    # Scrollbar
-    scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tree.yview)
-    tree.configure(yscrollcommand=scrollbar.set)
-    scrollbar.pack(side=tk.RIGHT, fill="y")
-    tree.pack(side=tk.LEFT, fill="both", expand=True)
+    for i, col in enumerate(columns):
+        tree.setColumnWidth(i, column_map[col][1])
+
+    table_layout.addWidget(tree)
 
     # Action buttons
-    action_frame = ttk.Frame(window)
-    action_frame.pack(fill="x", pady=(10, 0))
+    action_frame = QtWidgets.QWidget()
+    action_layout = QtWidgets.QHBoxLayout(action_frame)
+    action_layout.setContentsMargins(0, 10, 0, 0)
+    main_layout.addWidget(action_frame)
 
     def on_view_details():
-        sel = tree.selection()
-        if not sel:
-            messagebox.showinfo("Select", "Please select a purchase order")
+        selected_rows = tree.selectionModel().selectedRows()
+        if not selected_rows:
+            QtWidgets.QMessageBox.information(window, "Select", "Please select a purchase order")
             return
 
-        po_id = tree.item(sel[0], 'tags')[0] if tree.item(sel[0], 'tags') else None
+        row = selected_rows[0].row()
+        po_id = tree.item(row, 0).text() if tree.item(row, 0) else None
 
         if po_id:
-            open_po_details(window, po_id=int(po_id), current_user=current_user)
+            open_po_details(window, po_number=po_id, current_user=current_user)
 
     def on_receive_goods():
-        sel = tree.selection()
-        if not sel:
-            messagebox.showinfo("Select", "Please select a purchase order")
+        selected_rows = tree.selectionModel().selectedRows()
+        if not selected_rows:
+            QtWidgets.QMessageBox.information(window, "Select", "Please select a purchase order")
             return
 
-        po_id = tree.item(sel[0], 'tags')[0] if tree.item(sel[0], 'tags') else None
+        row = selected_rows[0].row()
+        po_id = tree.item(row, 0).text() if tree.item(row, 0) else None
 
         if po_id:
-            open_grn_dialog(window, po_id=int(po_id), current_user=current_user)
+            open_grn_dialog(window, po_number=po_id, current_user=current_user)
 
-    make_button(action_frame, "👁️ View Details", command=on_view_details, kind="primary").pack(side=tk.LEFT, padx=5)
-    make_button(action_frame, "📥 Receive Goods", command=on_receive_goods, kind="success").pack(side=tk.LEFT, padx=5)
+    view_btn = make_button(action_frame, "View Details", command=on_view_details, kind="primary")
+    action_layout.addWidget(view_btn)
+    receive_btn = make_button(action_frame, "Receive Goods", command=on_receive_goods, kind="success")
+    action_layout.addWidget(receive_btn)
+    action_layout.addStretch()
 
     # Store state
-    window.status_var = status_var
-    window.supplier_var = supplier_var
+    window.status_combo = status_combo
+    window.supplier_combo = supplier_combo
     window.tree = tree
     window.supplier_data = supplier_data
 
     def refresh_from_db():
         """Refresh purchase orders list from database using services."""
-        tree.delete(*tree.get_children())
+        tree.setRowCount(0)
 
-        status_filter = status_var.get()
-        supplier_sel = supplier_var.get()
+        status_filter = status_combo.currentText()
+        supplier_sel = supplier_combo.currentText()
 
         # Get all POs through service
         status_arg = None if status_filter == 'all' else status_filter
@@ -174,7 +190,7 @@ def create_purchase_orders_tab(parent, current_user=None):
 
         # Get supplier ID if selected
         supplier_id = None
-        if supplier_sel != "all":
+        if supplier_sel != "All Suppliers":
             for sid, sname in supplier_data:
                 if sname == supplier_sel:
                     supplier_id = sid
@@ -190,11 +206,11 @@ def create_purchase_orders_tab(parent, current_user=None):
             if po['status'] in status_counts:
                 status_counts[po['status']] += 1
 
-        window.summary_labels['draft'].config(text=str(status_counts['draft']))
-        window.summary_labels['sent'].config(text=str(status_counts['sent']))
-        window.summary_labels['confirmed'].config(text=str(status_counts['confirmed']))
-        window.summary_labels['received'].config(text=str(status_counts['received']))
-        window.summary_labels['total'].config(text=str(status_counts['total']))
+        window.summary_labels['draft'].setText(str(status_counts['draft']))
+        window.summary_labels['sent'].setText(str(status_counts['sent']))
+        window.summary_labels['confirmed'].setText(str(status_counts['confirmed']))
+        window.summary_labels['received'].setText(str(status_counts['received']))
+        window.summary_labels['total'].setText(str(status_counts['total']))
 
         # Populate table
         status_colors = {
@@ -206,19 +222,16 @@ def create_purchase_orders_tab(parent, current_user=None):
             'cancelled': COLOR_DANGER
         }
 
-        for po in pos:
+        for row_idx, po in enumerate(pos):
             status_text = po['status'].replace('_', ' ').title()
-            tags = (str(po['id']),)
-
-            tree.insert("", "end", values=(
-                po['po_number'],
-                po['supplier_name'],
-                po['order_date'][:10] if po['order_date'] else 'N/A',
-                po['expected_date'][:10] if po['expected_date'] else 'N/A',
-                status_text,
-                f"Rs. {po['total_amount']:,.2f}" if po['total_amount'] else 'Rs. 0.00',
-                po['item_count']
-            ), tags=tags)
+            tree.insertRow(row_idx)
+            tree.setItem(row_idx, 0, QtWidgets.QTableWidgetItem(po['po_number']))
+            tree.setItem(row_idx, 1, QtWidgets.QTableWidgetItem(po['supplier_name']))
+            tree.setItem(row_idx, 2, QtWidgets.QTableWidgetItem(po['order_date'][:10] if po['order_date'] else 'N/A'))
+            tree.setItem(row_idx, 3, QtWidgets.QTableWidgetItem(po['expected_date'][:10] if po['expected_date'] else 'N/A'))
+            tree.setItem(row_idx, 4, QtWidgets.QTableWidgetItem(status_text))
+            tree.setItem(row_idx, 5, QtWidgets.QTableWidgetItem(f"Rs. {po['total_amount']:,.2f}" if po['total_amount'] else 'Rs. 0.00'))
+            tree.setItem(row_idx, 6, QtWidgets.QTableWidgetItem(str(po['item_count'])))
 
     window.refresh_from_db = refresh_from_db
     refresh_from_db()
@@ -228,126 +241,130 @@ def create_purchase_orders_tab(parent, current_user=None):
 
 def open_create_po_dialog(parent, current_user=None):
     """Premium dialog to create a new purchase order with proper sizing and scrolling."""
-    from app_core import PremiumPopup, app_state, data_linker
+    dlg = QtWidgets.QDialog(parent)
+    dlg.setWindowTitle("Create Purchase Order")
+    dlg.resize(850, 700)
+    dlg.setModal(True)
 
-    dlg = PremiumPopup(parent, "Create Purchase Order", width=850, height=700, resizable=True)
-    content = dlg.get_content_frame()
+    main_layout = QtWidgets.QVBoxLayout(dlg)
+    main_layout.setContentsMargins(20, 20, 20, 20)
 
-    # Header with industry context
-    header_card = make_card(content, padx=30, pady=20)
-    header_card.pack(fill="x", pady=(20, 15))
+    # Header card
+    header_card = make_card(dlg, padx=30, pady=20)
+    header_layout = QtWidgets.QVBoxLayout(header_card)
+    header_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+    main_layout.addWidget(header_card)
 
-    industry_config = app_state.get_industry_config()
-    header_title = styled_label(header_card, f"📦 {industry_config['icon']} New Purchase Order",
-                                font=FONT_BOLD, foreground=COLOR_PRIMARY)
-    header_title.pack()
-
-    if industry_config['features']:
-        features_text = " • ".join(industry_config['features'])
-        features_label = styled_label(header_card, features_text,
-                                     font=("Segoe UI", 9), foreground="#6c757d")
-        features_label.pack(pady=(5, 0))
+    header_title = styled_label(header_card, "New Purchase Order", font=FONT_BOLD, foreground=COLOR_PRIMARY)
+    header_title.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+    header_layout.addWidget(header_title)
 
     # Main form card
-    form_card = make_card(content, padding=20)
-    form_card.pack(fill="both", expand=True, pady=(0, 15))
+    form_card = make_card(dlg, padding=20)
+    form_layout = QtWidgets.QVBoxLayout(form_card)
+    form_layout.setSpacing(15)
+    main_layout.addWidget(form_card)
 
     # Supplier selection row
-    supplier_row = ttk.Frame(form_card)
-    supplier_row.pack(fill="x", pady=(0, 15))
+    supplier_row = QtWidgets.QWidget()
+    supplier_layout = QtWidgets.QHBoxLayout(supplier_row)
+    supplier_layout.setContentsMargins(0, 0, 0, 0)
+    form_layout.addWidget(supplier_row)
 
-    styled_label(supplier_row, "Supplier *:", font=FONT_BOLD).grid(row=0, column=0, sticky="w", padx=5, pady=5)
-    styled_label(supplier_row, "Expected Date:", font=FONT_BOLD).grid(row=0, column=1, sticky="w", padx=(20, 5), pady=5)
+    supplier_left = QtWidgets.QWidget()
+    sl_layout = QtWidgets.QFormLayout(supplier_left)
+    supplier_layout.addWidget(supplier_left)
 
-    supplier_var = tk.StringVar()
-    supplier_combo = ttk.Combobox(supplier_row, textvariable=supplier_var, state="readonly", width=40)
-    supplier_combo.grid(row=1, column=0, sticky="ew", padx=5, pady=5)
+    supplier_right = QtWidgets.QWidget()
+    sr_layout = QtWidgets.QFormLayout(supplier_right)
+    supplier_layout.addWidget(supplier_right)
 
-    expected_var = tk.StringVar()
-    expected_entry = ttk.Entry(supplier_row, textvariable=expected_var, width=15)
-    expected_entry.grid(row=1, column=1, sticky="w", padx=5, pady=5)
+    supplier_combo = QtWidgets.QComboBox()
+    supplier_combo.setMinimumWidth(300)
+    sl_layout.addRow(styled_label(supplier_left, "Supplier *:", font=FONT_BOLD), supplier_combo)
+
+    expected_edit = QtWidgets.QLineEdit()
+    sr_layout.addRow(styled_label(supplier_right, "Expected Date:", font=FONT_BOLD), expected_edit)
 
     # Load suppliers via service
     suppliers = svc.supplier.get_all_suppliers()
     supplier_data = [(s['id'], f"{s['code']} - {s['name']}") for s in suppliers]
-    supplier_combo['values'] = [s[1] for s in supplier_data]
+    supplier_combo.addItems([s[1] for s in supplier_data])
 
     # Set default expected date (7 days from now)
     default_expected = (datetime.now() + timedelta(days=7)).strftime('%Y-%m-%d')
-    expected_var.set(default_expected)
+    expected_edit.setText(default_expected)
 
     # Product addition section
-    styled_label(form_card, "Add Products:", font=FONT_BOLD).pack(anchor="w", pady=(15, 8))
+    styled_label(form_card, "Add Products:", font=FONT_BOLD)
 
     products_card = make_card(form_card, padding=15)
-    products_card.pack(fill="x", pady=(0, 15))
+    products_layout = QtWidgets.QVBoxLayout(products_card)
+    products_layout.setSpacing(10)
+    form_layout.addWidget(products_card)
 
-    # Product selection row with better spacing
-    select_frame = ttk.Frame(products_card)
-    select_frame.pack(fill="x", pady=(0, 10))
+    # Product selection row
+    select_frame = QtWidgets.QWidget()
+    select_layout = QtWidgets.QHBoxLayout(select_frame)
+    select_layout.setContentsMargins(0, 0, 0, 0)
+    products_layout.addWidget(select_frame)
 
-    styled_label(select_frame, "Product:", font=FONT_BOLD).pack(side="left", padx=(0, 5))
-
-    product_var = tk.StringVar()
-    product_combo = ttk.Combobox(select_frame, textvariable=product_var, state="readonly", width=35)
-    product_combo.pack(side="left", padx=5, fill="x", expand=True)
+    product_combo = QtWidgets.QComboBox()
+    product_combo.setMinimumWidth(250)
+    select_layout.addWidget(styled_label(select_frame, "Product:", font=FONT_BOLD))
+    select_layout.addWidget(product_combo, stretch=1)
 
     # Load products from service
     try:
         products = svc.inventory.get_all_products()
         product_data = [(p.id, f"{p.model} (Stock: {p.stock}, Cost: Rs. {p.purchase_price})") for p in products]
-        product_combo['values'] = [p[1] for p in product_data]
+        product_combo.addItems([p[1] for p in product_data])
     except Exception as e:
         logging.error(f"Failed to load products: {e}")
         product_data = []
-        product_combo['values'] = ["No products available"]
 
-    styled_label(select_frame, "Qty:", font=FONT_BOLD).pack(side="left", padx=(15, 5))
+    qty_edit = QtWidgets.QLineEdit("1")
+    qty_edit.setFixedWidth(60)
+    select_layout.addWidget(styled_label(select_frame, "Qty:", font=FONT_BOLD))
+    select_layout.addWidget(qty_edit)
 
-    qty_var = tk.StringVar(value="1")
-    qty_entry = ttk.Entry(select_frame, textvariable=qty_var, width=8)
-    qty_entry.pack(side="left", padx=5)
-
-    styled_label(select_frame, "Unit Price:", font=FONT_BOLD).pack(side="left", padx=(10, 5))
-
-    price_var = tk.StringVar(value="0")
-    price_entry = ttk.Entry(select_frame, textvariable=price_var, width=12)
-    price_entry.pack(side="left", padx=5)
-
-    # Add button
-    add_btn = make_button(select_frame, "➕ Add", command=lambda: None, kind="primary")
-    add_btn.pack(side="left", padx=15)
+    price_edit = QtWidgets.QLineEdit("0")
+    price_edit.setFixedWidth(100)
+    select_layout.addWidget(styled_label(select_frame, "Unit Price:", font=FONT_BOLD))
+    select_layout.addWidget(price_edit)
 
     # Items list section
-    styled_label(form_card, "Order Items:", font=FONT_BOLD).pack(anchor="w", pady=(10, 5))
+    styled_label(form_card, "Order Items:", font=FONT_BOLD)
 
-    items_frame = ttk.Frame(form_card)
-    items_frame.pack(fill="both", expand=True)
+    items_frame = QtWidgets.QWidget()
+    items_layout = QtWidgets.QVBoxLayout(items_frame)
+    items_layout.setContentsMargins(0, 0, 0, 0)
+    form_layout.addWidget(items_frame)
 
-    columns = ("product", "quantity", "unit_price", "total", "actions")
-    items_tree = ttk.Treeview(items_frame, columns=columns, show="headings", height=8)
-
-    column_widths = {"product": 280, "quantity": 100, "unit_price": 130, "total": 130, "actions": 100}
-    for col in columns:
-        items_tree.heading(col, text=col.replace("_", " ").title())
-        items_tree.column(col, width=column_widths.get(col, 120))
-
-    scrollbar = ttk.Scrollbar(items_frame, orient="vertical", command=items_tree.yview)
-    items_tree.configure(yscrollcommand=scrollbar.set)
-
-    items_tree.pack(side="left", fill="both", expand=True)
-    scrollbar.pack(side="right", fill="y")
+    items_tree = QtWidgets.QTableWidget()
+    items_tree.setColumnCount(5)
+    items_tree.setHorizontalHeaderLabels(["Product", "Quantity", "Unit Price", "Total", "Actions"])
+    items_tree.horizontalHeader().setStretchLastSection(True)
+    items_tree.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Interactive)
+    items_tree.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+    items_tree.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+    items_tree.setColumnWidth(0, 280)
+    items_tree.setColumnWidth(1, 100)
+    items_tree.setColumnWidth(2, 130)
+    items_tree.setColumnWidth(3, 130)
+    items_tree.setColumnWidth(4, 100)
+    items_layout.addWidget(items_tree)
 
     # PO items storage
     po_items = []
 
     def add_item():
-        product_sel = product_var.get()
-        qty = qty_var.get()
-        price = price_var.get()
+        product_sel = product_combo.currentText()
+        qty = qty_edit.text()
+        price = price_edit.text()
 
-        if not product_sel or product_sel == "No products available":
-            messagebox.showerror("Error", "Please select a product")
+        if not product_sel:
+            QtWidgets.QMessageBox.critical(dlg, "Error", "Please select a product")
             return
 
         try:
@@ -356,7 +373,7 @@ def open_create_po_dialog(parent, current_user=None):
             if qty_int <= 0 or price_float < 0:
                 raise ValueError("quantity must be positive and price non-negative")
         except ValueError as e:
-            messagebox.showerror("Error", f"Invalid quantity or price: {e}")
+            QtWidgets.QMessageBox.critical(dlg, "Error", f"Invalid quantity or price: {e}")
             return
 
         # Find product ID
@@ -369,7 +386,7 @@ def open_create_po_dialog(parent, current_user=None):
                 break
 
         if not product_id:
-            messagebox.showerror("Error", "Product not found")
+            QtWidgets.QMessageBox.critical(dlg, "Error", "Product not found")
             return
 
         total = qty_int * price_float
@@ -384,67 +401,67 @@ def open_create_po_dialog(parent, current_user=None):
         })
 
         # Update tree
-        items_tree.insert("", "end", values=(
-            product_name,
-            qty_int,
-            f"Rs. {price_float:,.2f}",
-            f"Rs. {total:,.2f}",
-            "🗑️ Remove"
-        ))
+        row = items_tree.rowCount()
+        items_tree.insertRow(row)
+        items_tree.setItem(row, 0, QtWidgets.QTableWidgetItem(product_name))
+        items_tree.setItem(row, 1, QtWidgets.QTableWidgetItem(str(qty_int)))
+        items_tree.setItem(row, 2, QtWidgets.QTableWidgetItem(f"Rs. {price_float:,.2f}"))
+        items_tree.setItem(row, 3, QtWidgets.QTableWidgetItem(f"Rs. {total:,.2f}"))
+        items_tree.setItem(row, 4, QtWidgets.QTableWidgetItem("Remove"))
 
         # Clear selection
-        product_var.set("")
-        qty_var.set("1")
-        price_var.set("0")
+        product_combo.setCurrentIndex(-1)
+        qty_edit.setText("1")
+        price_edit.setText("0")
         update_total()
 
-    # Connect add button
-    add_btn.config(command=add_item)
-
-    def on_item_click(event):
-        sel = items_tree.selection()
-        if not sel:
-            return
-
-        item = items_tree.item(sel[0])
-        if item['values'][4] == "🗑️ Remove":
-            index = items_tree.index(sel[0])
-            if 0 <= index < len(po_items):
-                po_items.pop(index)
-                items_tree.delete(sel[0])
+    def on_item_click(index):
+        row = index.row()
+        col = index.column()
+        if col == 4:
+            if 0 <= row < len(po_items):
+                po_items.pop(row)
+                items_tree.removeRow(row)
                 update_total()
 
-    items_tree.bind("<Button-1>", on_item_click)
+    items_tree.clicked.connect(on_item_click)
+
+    add_btn = make_button(select_frame, "Add", command=add_item, kind="primary")
+    select_layout.addWidget(add_btn)
 
     # Notes section
-    styled_label(form_card, "Notes:", font=FONT_BOLD).pack(anchor="w", pady=(15, 5))
-    notes_text = tk.Text(form_card, height=3, font=FONT_REGULAR)
-    notes_text.pack(fill="x", pady=(0, 15))
+    styled_label(form_card, "Notes:", font=FONT_BOLD)
+    notes_edit = QtWidgets.QTextEdit()
+    notes_edit.setMaximumHeight(80)
+    form_layout.addWidget(notes_edit)
 
     # Total label
-    total_var = tk.StringVar(value="Total: Rs. 0.00")
-    total_label = styled_label(form_card, textvariable=total_var, font=("Segoe UI", 14, "bold"), foreground=COLOR_SUCCESS)
-    total_label.pack(anchor="e", pady=(5, 10))
+    total_label = styled_label(form_card, "Total: Rs. 0.00", font=("Segoe UI", 14, "bold"), foreground=COLOR_SUCCESS)
+    total_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight)
+    form_layout.addWidget(total_label)
 
     def update_total():
         total = sum(item['total'] for item in po_items)
-        total_var.set(f"Total: Rs. {total:,.2f}")
+        total_label.setText(f"Total: Rs. {total:,.2f}")
 
     # Button bar at bottom
-    button_frame = ttk.Frame(content)
-    button_frame.pack(fill="x", pady=(10, 25))
+    button_frame = QtWidgets.QWidget()
+    button_layout = QtWidgets.QHBoxLayout(button_frame)
+    button_layout.setContentsMargins(0, 10, 0, 0)
+    button_layout.addStretch()
+    main_layout.addWidget(button_frame)
 
     def save_po():
-        supplier_sel = supplier_var.get()
-        expected_date = expected_var.get().strip()
-        notes = notes_text.get("1.0", "end").strip()
+        supplier_sel = supplier_combo.currentText()
+        expected_date = expected_edit.text().strip()
+        notes = notes_edit.toPlainText().strip()
 
         if not supplier_sel:
-            messagebox.showerror("Error", "Please select a supplier")
+            QtWidgets.QMessageBox.critical(dlg, "Error", "Please select a supplier")
             return
 
         if not po_items:
-            messagebox.showerror("Error", "Please add at least one product")
+            QtWidgets.QMessageBox.critical(dlg, "Error", "Please add at least one product")
             return
 
         # Get supplier ID
@@ -479,11 +496,8 @@ def open_create_po_dialog(parent, current_user=None):
             # Create PO through service
             svc.purchase_order.create_order(order_data, items, current_user)
 
-            # Link to inventory (will be processed when received)
-            # data_linker.process_purchase_order(po_items, supplier_id)
-
-            messagebox.showinfo("Success", f"Purchase Order created:\n{po_number}")
-            dlg.destroy()
+            QtWidgets.QMessageBox.information(dlg, "Success", f"Purchase Order created:\n{po_number}")
+            dlg.accept()
 
             # Refresh parent
             if hasattr(parent, 'refresh_from_db'):
@@ -491,32 +505,36 @@ def open_create_po_dialog(parent, current_user=None):
 
         except Exception as e:
             logging.exception("Failed to create purchase order")
-            messagebox.showerror("Error", f"Failed to create PO: {str(e)}")
+            QtWidgets.QMessageBox.critical(dlg, "Error", f"Failed to create PO: {str(e)}")
 
-    # Buttons - right aligned, never hidden
-    cancel_btn = make_button(button_frame, "Cancel", command=dlg.destroy, kind="secondary", width=BTN_WIDTH['dialog'])
-    cancel_btn.pack(side="right", padx=10)
-
-    create_btn = make_button(button_frame, "💾 Create PO", command=save_po, kind="success", width=BTN_WIDTH['action'])
-    create_btn.pack(side="right", padx=10)
+    create_btn = make_button(button_frame, "Create PO", command=save_po, kind="success")
+    button_layout.addWidget(create_btn)
+    cancel_btn = make_button(button_frame, "Cancel", command=dlg.reject, kind="secondary")
+    button_layout.addWidget(cancel_btn)
 
     # Auto-update total when items change
     update_total()
 
 
-def open_po_details(parent, po_id, current_user=None):
+def open_po_details(parent, po_number, current_user=None):
     """View purchase order details."""
-    from app_core import PremiumPopup
-    dlg = PremiumPopup(parent, "Purchase Order Details", width=900, height=750, resizable=True)
-    content = dlg.get_content_frame()
+    dlg = QtWidgets.QDialog(parent)
+    dlg.setWindowTitle("Purchase Order Details")
+    dlg.resize(900, 750)
+    dlg.setModal(True)
+
+    main_layout = QtWidgets.QVBoxLayout(dlg)
+    main_layout.setContentsMargins(20, 20, 20, 20)
 
     # Get PO through service
     pos = svc.purchase_order.get_all_orders()
-    po = next((p for p in pos if p['id'] == po_id), None)
+    po = next((p for p in pos if p['po_number'] == po_number), None)
 
     if not po:
-        styled_label(content, "Purchase Order not found", font=FONT_BOLD, foreground=COLOR_DANGER).pack(anchor=tk.W)
-        make_button(content, "Close", command=dlg.destroy, kind="secondary").pack(anchor=tk.E, pady=(15, 0))
+        styled_label(dlg, "Purchase Order not found", font=FONT_BOLD, foreground=COLOR_DANGER)
+        close_btn = QtWidgets.QPushButton("Close", dlg)
+        close_btn.clicked.connect(dlg.reject)
+        main_layout.addWidget(close_btn)
         return
 
     # Get supplier info
@@ -524,16 +542,18 @@ def open_po_details(parent, po_id, current_user=None):
     supplier = next((s for s in suppliers if s['id'] == po['supplier_id']), None)
 
     # Header
-    header_frame = ttk.Frame(content)
-    header_frame.pack(fill=tk.X)
+    header_frame = QtWidgets.QWidget()
+    header_layout = QtWidgets.QVBoxLayout(header_frame)
+    main_layout.addWidget(header_frame)
 
-    styled_label(header_frame, f"Purchase Order: {po['po_number']}", font=FONT_BOLD).pack(anchor=tk.W)
+    styled_label(header_frame, f"Purchase Order: {po['po_number']}", font=FONT_BOLD)
     status_color = COLOR_SUCCESS if po['status'] == 'received' else COLOR_PRIMARY
-    styled_label(header_frame, f"Status: {po['status'].title()}", foreground=status_color).pack(anchor=tk.W, pady=(5, 15))
+    styled_label(header_frame, f"Status: {po['status'].title()}", foreground=status_color)
 
     # PO Info
-    info_frame = make_card(content, padding=15)
-    info_frame.pack(fill=tk.X)
+    info_frame = make_card(dlg, padding=15)
+    info_layout = QtWidgets.QFormLayout(info_frame)
+    main_layout.addWidget(info_frame)
 
     info = [
         ("Supplier:", supplier['name'] if supplier else 'N/A'),
@@ -544,99 +564,110 @@ def open_po_details(parent, po_id, current_user=None):
         ("Created By:", po.get('created_by_name', 'System') or 'System'),
     ]
 
-    for i, (label, value) in enumerate(info):
-        row = i // 3
-        col = (i % 3) * 2
-        styled_label(info_frame, f"{label}", font=("Segoe UI", 10, "bold")).grid(row=row, column=col, sticky=tk.W, padx=5, pady=3)
-        styled_label(info_frame, f"{value}").grid(row=row, column=col+1, sticky=tk.W, padx=5, pady=3)
+    for lbl, val in info:
+        info_layout.addRow(label(info_frame, lbl, kind="bold"), label(info_frame, val))
 
     # Items
-    styled_label(content, "Order Items:", font=FONT_BOLD).pack(anchor=tk.W, pady=(15, 5))
+    styled_label(dlg, "Order Items:", font=FONT_BOLD)
 
-    items_frame = make_card(content, padding=10)
-    items_frame.pack(fill=tk.BOTH, expand=True)
+    items_frame = make_card(dlg, padding=10)
+    items_layout = QtWidgets.QVBoxLayout(items_frame)
+    main_layout.addWidget(items_frame)
 
     columns = ("product", "ordered", "received", "unit_price", "total")
-    items_tree = ttk.Treeview(items_frame, columns=columns, show="headings")
-
-    for col in columns:
-        items_tree.heading(col, text=col.replace('_', ' ').title())
-        items_tree.column(col, width=100)
-
-    items_tree.pack(fill=tk.BOTH, expand=True)
+    items_tree = QtWidgets.QTableWidget()
+    items_tree.setColumnCount(len(columns))
+    items_tree.setHorizontalHeaderLabels([col.replace('_', ' ').title() for col in columns])
+    items_tree.horizontalHeader().setStretchLastSection(True)
+    items_tree.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Interactive)
+    items_tree.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+    items_tree.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+    for i in range(5):
+        items_tree.setColumnWidth(i, 100)
+    items_layout.addWidget(items_tree)
 
     # Get PO items through service
-    po_items = svc.purchase_order.get_order_items(po_id)
+    po_items = svc.purchase_order.get_order_items(po['id'])
 
     total = 0
-    for item in po_items:
+    for row_idx, item in enumerate(po_items):
         # Get product info
         product = svc.inventory.get_product_by_id(item['product_id'])
         product_name = product.model if product else 'Unknown'
 
-        items_tree.insert("", "end", values=(
-            product_name,
-            item['quantity_ordered'],
-            item['quantity_received'] or 0,
-            f"Rs. {item['unit_price']:,.2f}",
-            f"Rs. {item['total_price']:,.2f}"
-        ))
+        items_tree.insertRow(row_idx)
+        items_tree.setItem(row_idx, 0, QtWidgets.QTableWidgetItem(product_name))
+        items_tree.setItem(row_idx, 1, QtWidgets.QTableWidgetItem(str(item['quantity_ordered'])))
+        items_tree.setItem(row_idx, 2, QtWidgets.QTableWidgetItem(str(item['quantity_received'] or 0)))
+        items_tree.setItem(row_idx, 3, QtWidgets.QTableWidgetItem(f"Rs. {item['unit_price']:,.2f}"))
+        items_tree.setItem(row_idx, 4, QtWidgets.QTableWidgetItem(f"Rs. {item['total_price']:,.2f}"))
         total += item['total_price']
 
     # Total
-    styled_label(content, f"Total Amount: Rs. {total:,.2f}", font=("Segoe UI", 12, "bold"), foreground=COLOR_PRIMARY).pack(anchor=tk.E, pady=(10, 0))
+    styled_label(dlg, f"Total Amount: Rs. {total:,.2f}", font=("Segoe UI", 12, "bold"), foreground=COLOR_PRIMARY)
 
     # Notes
     if po.get('notes'):
-        styled_label(content, "Notes:", font=FONT_BOLD).pack(anchor=tk.W, pady=(10, 5))
-        styled_label(content, po['notes'], justify=tk.LEFT).pack(anchor=tk.W)
+        styled_label(dlg, "Notes:", font=FONT_BOLD)
+        styled_label(dlg, po['notes'])
 
-    def close():
-        dlg.destroy()
+    # Close button
+    close_btn = QtWidgets.QPushButton("Close", dlg)
+    close_btn.clicked.connect(dlg.reject)
+    main_layout.addWidget(close_btn)
 
-    dlg.add_button_bar([{"text": "Close", "command": close, "style": "TButton"}])
 
-
-def open_grn_dialog(parent, po_id, current_user=None):
+def open_grn_dialog(parent, po_number, current_user=None):
     """Goods Receipt Note - Receive products from PO."""
-    from app_core import PremiumPopup
-    dlg = PremiumPopup(parent, "Receive Goods (GRN)", width=850, height=750, resizable=True)
-    content = dlg.get_content_frame()
+    dlg = QtWidgets.QDialog(parent)
+    dlg.setWindowTitle("Receive Goods (GRN)")
+    dlg.resize(850, 750)
+    dlg.setModal(True)
+
+    main_layout = QtWidgets.QVBoxLayout(dlg)
+    main_layout.setContentsMargins(20, 20, 20, 20)
 
     # Get PO info through service
     pos = svc.purchase_order.get_all_orders()
-    po = next((p for p in pos if p['id'] == po_id), None)
+    po = next((p for p in pos if p['po_number'] == po_number), None)
 
     if not po:
-        styled_label(content, "Purchase Order not found", font=FONT_BOLD, foreground=COLOR_DANGER).pack(anchor=tk.W)
-        make_button(content, "Close", command=dlg.destroy, kind="secondary").pack(anchor=tk.E, pady=(15, 0))
+        styled_label(dlg, "Purchase Order not found", font=FONT_BOLD, foreground=COLOR_DANGER)
+        close_btn = QtWidgets.QPushButton("Close", dlg)
+        close_btn.clicked.connect(dlg.reject)
+        main_layout.addWidget(close_btn)
         return
 
-    styled_label(content, f"Receive Goods for {po['po_number']}", font=FONT_BOLD).pack(anchor=tk.W, pady=(0, 15))
+    styled_label(dlg, f"Receive Goods for {po['po_number']}", font=FONT_BOLD)
 
     if po['status'] == 'received':
-        styled_label(content, "⚠️ This PO has already been fully received", foreground=COLOR_WARNING).pack(anchor=tk.W, pady=(0, 10))
+        styled_label(dlg, "This PO has already been fully received", foreground=COLOR_WARNING)
 
     # Items to receive
-    styled_label(content, "Items to Receive:", font=FONT_BOLD).pack(anchor=tk.W, pady=(10, 5))
+    styled_label(dlg, "Items to Receive:", font=FONT_BOLD)
 
-    items_frame = make_card(content, padding=10)
-    items_frame.pack(fill=tk.BOTH, expand=True)
+    items_frame = make_card(dlg, padding=10)
+    items_layout = QtWidgets.QVBoxLayout(items_frame)
+    main_layout.addWidget(items_frame)
 
     columns = ("product", "ordered", "received", "pending", "receive_qty")
-    items_tree = ttk.Treeview(items_frame, columns=columns, show="headings")
-
-    for col in columns:
-        items_tree.heading(col, text=col.replace('_', ' ').title())
-        items_tree.column(col, width=100 if col != "product" else 200)
-
-    items_tree.pack(fill=tk.BOTH, expand=True)
+    items_tree = QtWidgets.QTableWidget()
+    items_tree.setColumnCount(len(columns))
+    items_tree.setHorizontalHeaderLabels([col.replace('_', ' ').title() for col in columns])
+    items_tree.horizontalHeader().setStretchLastSection(True)
+    items_tree.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Interactive)
+    items_tree.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+    items_tree.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+    items_tree.setColumnWidth(0, 200)
+    for i in range(1, 5):
+        items_tree.setColumnWidth(i, 100)
+    items_layout.addWidget(items_tree)
 
     # Get PO items through service
-    po_items_data = svc.purchase_order.get_order_items(po_id)
+    po_items_data = svc.purchase_order.get_order_items(po['id'])
 
     items_data = []
-    for item in po_items_data:
+    for row_idx, item in enumerate(po_items_data):
         product = svc.inventory.get_product_by_id(item['product_id'])
         product_name = product.model if product else 'Unknown'
 
@@ -650,22 +681,21 @@ def open_grn_dialog(parent, po_id, current_user=None):
             'pending': pending
         })
 
-        items_tree.insert("", "end", values=(
-            product_name,
-            item['quantity_ordered'],
-            item['quantity_received'] or 0,
-            pending,
-            pending  # Default receive qty = pending
-        ))
+        items_tree.insertRow(row_idx)
+        items_tree.setItem(row_idx, 0, QtWidgets.QTableWidgetItem(product_name))
+        items_tree.setItem(row_idx, 1, QtWidgets.QTableWidgetItem(str(item['quantity_ordered'])))
+        items_tree.setItem(row_idx, 2, QtWidgets.QTableWidgetItem(str(item['quantity_received'] or 0)))
+        items_tree.setItem(row_idx, 3, QtWidgets.QTableWidgetItem(str(pending)))
+        items_tree.setItem(row_idx, 4, QtWidgets.QTableWidgetItem(str(pending)))
 
     # Receive button
     def receive_goods():
         try:
             # Receive all pending items through service
-            svc.purchase_order.receive_order(po_id, current_user)
+            svc.purchase_order.receive_order(po['id'], current_user)
 
-            messagebox.showinfo("Success", "Goods received successfully")
-            dlg.destroy()
+            QtWidgets.QMessageBox.information(dlg, "Success", "Goods received successfully")
+            dlg.accept()
 
             # Refresh parent
             if hasattr(parent, 'refresh_from_db'):
@@ -673,9 +703,15 @@ def open_grn_dialog(parent, po_id, current_user=None):
 
         except Exception as e:
             logging.exception("Failed to receive goods")
-            messagebox.showerror("Error", f"Failed to receive goods: {e}")
+            QtWidgets.QMessageBox.critical(dlg, "Error", f"Failed to receive goods: {e}")
 
-    dlg.add_button_bar([
-        {"text": "Receive All Pending", "command": receive_goods, "style": "Accent.TButton"},
-        {"text": "Cancel", "command": dlg.destroy, "style": "TButton"}
-    ])
+    # Button bar
+    button_frame = QtWidgets.QWidget()
+    button_layout = QtWidgets.QHBoxLayout(button_frame)
+    button_layout.addStretch()
+    main_layout.addWidget(button_frame)
+
+    receive_btn = make_button(button_frame, "Receive All Pending", command=receive_goods, kind="success")
+    button_layout.addWidget(receive_btn)
+    cancel_btn = make_button(button_frame, "Cancel", command=dlg.reject, kind="secondary")
+    button_layout.addWidget(cancel_btn)

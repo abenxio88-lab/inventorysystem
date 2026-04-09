@@ -1,4 +1,4 @@
-"""Centralized UI theming helper with Premium Glassmorphism Design.
+"""Centralized UI theming helper with Premium Glassmorphism Design (PySide6).
 
 Modern premium design system featuring:
 - Glassmorphism effects with backdrop blur simulation
@@ -10,24 +10,12 @@ Modern premium design system featuring:
 - Runtime theme switching (Light/Dark)
 """
 import logging
-try:
-    import ttkbootstrap as tb
-    from ttkbootstrap import Style
-    USING_BOOTSTRAP = True
-except Exception:
-    tb = None
-    Style = None
-    USING_BOOTSTRAP = False
-
-import tkinter as tk
-from tkinter import ttk
-import tkinter.font as tkfont
+from PySide6 import QtWidgets, QtCore, QtGui
 
 # ============================================
 # THEME STATE MANAGEMENT
 # ============================================
 _current_theme = "light"  # "light" or "dark"
-STYLE = None  # Global ttkbootstrap style observer
 
 def get_current_theme():
     """Get current theme name."""
@@ -118,7 +106,7 @@ def get_color(name):
         'gradient_start': GRADIENT_START_LIGHT,
         'gradient_end': GRADIENT_END_LIGHT,
     }
-    
+
     dark_colors = {
         'app_bg': COLOR_APP_BG_DARK,
         'card_bg': COLOR_CARD_BG_DARK,
@@ -140,7 +128,7 @@ def get_color(name):
         'gradient_start': GRADIENT_START_DARK,
         'gradient_end': GRADIENT_END_DARK,
     }
-    
+
     if _current_theme == "dark":
         return dark_colors.get(name, dark_colors.get('app_bg'))
     return light_colors.get(name, light_colors.get('app_bg'))
@@ -187,17 +175,17 @@ def get_COLOR_GLASS_HOVER(): return get_color('glass_hover')
 def get_GRADIENT_START(): return get_color('gradient_start')
 def get_GRADIENT_END(): return get_color('gradient_end')
 
-# Typography
+# Typography - Qt font tuples: (family, size, weight)
 FONT_FAMILY_PRIMARY = "Segoe UI Variable"
 FONT_FAMILY_SECONDARY = "Segoe UI"
 DEFAULT_FONT = (FONT_FAMILY_SECONDARY, 11)
-HEADING_FONT = (FONT_FAMILY_PRIMARY, 24, "bold")
-SUBHEADING_FONT = (FONT_FAMILY_PRIMARY, 16, "bold")
+HEADING_FONT = (FONT_FAMILY_PRIMARY, 24, 700)  # 700 = bold
+SUBHEADING_FONT = (FONT_FAMILY_PRIMARY, 16, 700)
 FONT_REGULAR = (FONT_FAMILY_SECONDARY, 11)
-FONT_BOLD = (FONT_FAMILY_SECONDARY, 12, "bold")
-FONT_HEADING = (FONT_FAMILY_PRIMARY, 26, "bold")
+FONT_BOLD = (FONT_FAMILY_SECONDARY, 12, 700)
+FONT_HEADING = (FONT_FAMILY_PRIMARY, 26, 700)
 FONT_SMALL = (FONT_FAMILY_SECONDARY, 9)
-FONT_LARGE = (FONT_FAMILY_PRIMARY, 14, "bold")
+FONT_LARGE = (FONT_FAMILY_PRIMARY, 14, 700)
 
 # Spacing system
 SPACING_XS = 4
@@ -207,39 +195,22 @@ SPACING_LARGE = 24
 SPACING_XL = 32
 SPACING_XXL = 48
 
-# Border radius
+# Border radius (for QSS border-radius)
 RADIUS_SMALL = 6
 RADIUS_DEFAULT = 10
 RADIUS_LARGE = 16
 RADIUS_XL = 24
 
-# Shadow definitions
+# Shadow definitions (QSS box-shadow)
 SHADOW_SMALL = "0 1px 3px rgba(0,0,0,0.08)"
 SHADOW_DEFAULT = "0 4px 12px rgba(0,0,0,0.1)"
 SHADOW_LARGE = "0 8px 24px rgba(0,0,0,0.12)"
 SHADOW_GLASS = "0 8px 32px rgba(31, 38, 135, 0.15)"
 
 
-def setup_theme(root=None, theme_name="litera", is_dark=False):
-    """Setup application-wide premium theme. Safe to call multiple times.
-    
-    Args:
-        root: The root window
-        theme_name: ttkbootstrap theme name (used if bootstrap available)
-        is_dark: Boolean to enable dark mode
-    """
-    global _current_theme
-    
-    # Update theme state if explicitly provided, otherwise use current
-    if is_dark is True:
-        _current_theme = "dark"
-    elif is_dark is False:
-        _current_theme = "light"
-    
-    # is_dark is now resolved from state for the rest of function
-    active_is_dark = (_current_theme == "dark")
-    
-    # Get current colors based on theme
+def _build_stylesheet(is_dark):
+    """Build a complete QSS stylesheet string for the theme."""
+    # Resolve colors
     app_bg = get_color('app_bg')
     card_bg = get_color('card_bg')
     text_main = get_color('text_main')
@@ -252,540 +223,724 @@ def setup_theme(root=None, theme_name="litera", is_dark=False):
     danger = get_color('danger')
     info = get_color('info')
     border = get_color('border')
-    
-    if USING_BOOTSTRAP:
-        try:
-            # Determine correct theme name: litera for light, cyborg for dark (as per user request)
-            if is_dark:
-                bootstrap_theme = "cyborg"
-            else:
-                bootstrap_theme = theme_name if theme_name else "litera"
-            
-            # Create or update global style observer
-            global STYLE
-            if STYLE is None:
-                # First time: create the Style object and specify theme
-                STYLE = Style(theme=bootstrap_theme)
-                logging.info(f"Style initialized with theme: {bootstrap_theme}")
-            else:
-                # Subsequent calls: switch theme
-                try:
-                    STYLE.theme_use(bootstrap_theme)
-                    logging.info(f"Theme switched to: {bootstrap_theme}")
-                except Exception as e:
-                    logging.warning(f"Theme switch failed: {e}")
-            
-            # Update root background if provided
-            if root is not None:
-                try:
-                    app_bg = get_color('app_bg')
-                    root.configure(bg=app_bg)
-                except Exception:
-                    pass
-            return
-        except Exception as e:
-            logging.warning(f"ttkbootstrap present but failed to apply theme {bootstrap_theme if 'bootstrap_theme' in locals() else 'unknown'}: {e}")
-            # Continue to fallback
+    glass_bg = get_color('glass_bg')
+    glass_card = get_color('glass_card')
+    glass_hover = get_color('glass_hover')
 
-    # Fallback: configure ttk styles with premium look
-    try:
-        style = ttk.Style()
-        try:
-            style.theme_use("clam")
-        except Exception:
-            pass
+    font_family = FONT_FAMILY_SECONDARY
+    font_size = 11
 
-        if root is not None:
-            try:
-                root.configure(bg=app_bg)
-            except Exception:
-                pass
+    return f"""
+    /* ===== Application ===== */
+    QMainWindow, QDialog, QWidget {{
+        background-color: {app_bg};
+        color: {text_main};
+        font-family: "{font_family}";
+        font-size: {font_size}px;
+    }}
 
-        # Premium Frame styling
-        style.configure("TFrame", background=app_bg)
-        
-        # Premium Label styling
-        style.configure("TLabel", font=DEFAULT_FONT, background=app_bg, foreground=text_main)
-        style.configure("Heading.TLabel", font=SUBHEADING_FONT, background=app_bg, foreground=text_main)
-        style.configure("Muted.TLabel", font=DEFAULT_FONT, background=app_bg, foreground=text_muted)
-        
-        # Premium Entry styling
-        style.configure("TEntry", font=DEFAULT_FONT, padding=14, fieldbackground=card_bg, 
-                       foreground=text_main, borderwidth=1, relief="flat")
-        
-        # Premium Button styling with rounded corners
-        style.configure("TButton", font=FONT_BOLD, padding=14, borderwidth=0, focuscolor=primary)
-        style.configure("Primary.TButton", background=primary, foreground="#FFFFFF")
-        style.map("Primary.TButton", 
-                 background=[('active', primary_light), ('pressed', primary_dark)], 
-                 foreground=[('!disabled', '#FFFFFF')])
-        
-        style.configure("Secondary.TButton", background=card_bg, foreground=text_main, 
-                       borderwidth=1, bordercolor=border)
-        style.map("Secondary.TButton", 
-                 background=[('active', app_bg), ('pressed', border)], 
-                 bordercolor=[('active', primary), ('pressed', secondary)])
-        
-        style.configure("Success.TButton", background=success, foreground="#FFFFFF")
-        style.map("Success.TButton", background=[('active', '#059669'), ('pressed', '#047857')])
-        
-        style.configure("Danger.TButton", background=danger, foreground="#FFFFFF")
-        style.map("Danger.TButton", background=[('active', '#DC2626'), ('pressed', '#B91C1C')])
-        
-        style.configure("Info.TButton", background=info, foreground="#FFFFFF")
-        style.map("Info.TButton", background=[('active', '#0284C7'), ('pressed', '#0369A1')])
+    /* ===== Frames / Containers ===== */
+    QFrame {{
+        background-color: {app_bg};
+        border: none;
+    }}
 
-        # Premium Treeview styling
-        style.configure("Treeview", font=DEFAULT_FONT, rowheight=36, background=card_bg, 
-                       fieldbackground=card_bg, foreground=text_main,
-                       borderwidth=0, relief="flat")
-        style.configure("Treeview.Heading", font=FONT_BOLD, background=app_bg, 
-                       foreground=text_main, padding=12)
-        style.map("Treeview", 
-                 background=[('selected', primary)], 
-                 foreground=[('selected', '#FFFFFF')])
-        
-        # Premium Combobox
-        style.configure("TCombobox", font=DEFAULT_FONT, padding=12, fieldbackground=card_bg,
-                       foreground=text_main, borderwidth=1, relief="flat")
-        style.configure("Combobox.PopdownFrame", background=card_bg, borderwidth=1)
-        
-        # Premium Notebook (Tabs)
-        style.configure("TNotebook", background=app_bg, borderwidth=0)
-        style.configure("TNotebook.Tab", font=FONT_BOLD, padding=[20, 12], background=card_bg,
-                       foreground=text_muted, borderwidth=0, focuscolor=primary)
-        style.map("TNotebook.Tab",
-                 background=[('selected', primary)],
-                 foreground=[('selected', '#FFFFFF'), ('!selected', text_muted)],
-                 expand=[('selected', [1, 1, 1, 0])])
+    /* ===== Labels ===== */
+    QLabel {{
+        background-color: transparent;
+        color: {text_main};
+        font-family: "{font_family}";
+        font-size: {font_size}px;
+    }}
+    QLabel#heading {{
+        font-family: "{FONT_FAMILY_PRIMARY}";
+        font-size: 26px;
+        font-weight: 700;
+        color: {text_main};
+    }}
+    QLabel#subheading {{
+        font-family: "{FONT_FAMILY_PRIMARY}";
+        font-size: 16px;
+        font-weight: 700;
+        color: {text_main};
+    }}
+    QLabel#muted {{
+        color: {text_muted};
+    }}
 
-        logging.info("Premium ttk fallback theme configured (dark=%s)", is_dark)
-    except Exception:
-        logging.error("Failed to configure premium ttk style", exc_info=True)
+    /* ===== LineEdits / Entries ===== */
+    QLineEdit {{
+        background-color: {card_bg};
+        color: {text_main};
+        border: 1px solid {border};
+        border-radius: {RADIUS_DEFAULT}px;
+        padding: 10px 14px;
+        font-family: "{font_family}";
+        font-size: {font_size}px;
+        selection-background-color: {primary};
+    }}
+    QLineEdit:focus {{
+        border: 2px solid {primary};
+    }}
+    QLineEdit:disabled {{
+        background-color: {glass_bg};
+        color: {text_muted};
+    }}
+
+    /* ===== Buttons ===== */
+    QPushButton {{
+        background-color: {primary};
+        color: #FFFFFF;
+        border: none;
+        border-radius: {RADIUS_DEFAULT}px;
+        padding: 10px 20px;
+        font-family: "{font_family}";
+        font-size: 12px;
+        font-weight: 700;
+    }}
+    QPushButton:hover {{
+        background-color: {primary_light};
+    }}
+    QPushButton:pressed {{
+        background-color: {primary_dark};
+    }}
+    QPushButton:disabled {{
+        background-color: {border};
+        color: {text_muted};
+    }}
+
+    QPushButton#secondary {{
+        background-color: {card_bg};
+        color: {text_main};
+        border: 1px solid {border};
+    }}
+    QPushButton#secondary:hover {{
+        border-color: {primary};
+        background-color: {app_bg};
+    }}
+    QPushButton#secondary:pressed {{
+        border-color: {secondary};
+        background-color: {border};
+    }}
+
+    QPushButton#success {{
+        background-color: {success};
+        color: #FFFFFF;
+    }}
+    QPushButton#success:hover {{
+        background-color: #059669;
+    }}
+    QPushButton#success:pressed {{
+        background-color: #047857;
+    }}
+
+    QPushButton#danger {{
+        background-color: {danger};
+        color: #FFFFFF;
+    }}
+    QPushButton#danger:hover {{
+        background-color: #DC2626;
+    }}
+    QPushButton#danger:pressed {{
+        background-color: #B91C1C;
+    }}
+
+    QPushButton#info {{
+        background-color: {info};
+        color: #FFFFFF;
+    }}
+    QPushButton#info:hover {{
+        background-color: #0284C7;
+    }}
+    QPushButton#info:pressed {{
+        background-color: #0369A1;
+    }}
+
+    QPushButton#warning {{
+        background-color: {get_color('warning')};
+        color: #FFFFFF;
+    }}
+
+    /* ===== ComboBox ===== */
+    QComboBox {{
+        background-color: {card_bg};
+        color: {text_main};
+        border: 1px solid {border};
+        border-radius: {RADIUS_DEFAULT}px;
+        padding: 8px 12px;
+        font-family: "{font_family}";
+        font-size: {font_size}px;
+    }}
+    QComboBox:hover {{
+        border-color: {primary};
+    }}
+    QComboBox::drop-down {{
+        border: none;
+        padding-right: 8px;
+    }}
+    QComboBox QAbstractItemView {{
+        background-color: {card_bg};
+        color: {text_main};
+        border: 1px solid {border};
+        selection-background-color: {primary};
+        selection-color: #FFFFFF;
+    }}
+
+    /* ===== TreeView / Table ===== */
+    QTreeView, QTableView {{
+        background-color: {card_bg};
+        color: {text_main};
+        gridline-color: {border};
+        border: 1px solid {border};
+        border-radius: {RADIUS_DEFAULT}px;
+        font-family: "{font_family}";
+        font-size: {font_size}px;
+    }}
+    QTreeView::item, QTableView::item {{
+        padding: 8px;
+    }}
+    QTreeView::item:selected, QTableView::item:selected {{
+        background-color: {primary};
+        color: #FFFFFF;
+    }}
+    QHeaderView::section {{
+        background-color: {app_bg};
+        color: {text_main};
+        font-weight: 700;
+        padding: 10px 12px;
+        border: none;
+        border-bottom: 2px solid {border};
+        font-family: "{font_family}";
+        font-size: {font_size}px;
+    }}
+
+    /* ===== TabWidget ===== */
+    QTabWidget::pane {{
+        border: none;
+        background-color: {app_bg};
+    }}
+    QTabBar::tab {{
+        background-color: {card_bg};
+        color: {text_muted};
+        padding: 10px 20px;
+        border: none;
+        border-bottom: 3px solid transparent;
+        font-family: "{font_family}";
+        font-size: 14px;
+        font-weight: 700;
+        margin-right: 4px;
+    }}
+    QTabBar::tab:hover {{
+        color: {text_main};
+    }}
+    QTabBar::tab:selected {{
+        background-color: {primary};
+        color: #FFFFFF;
+        border-bottom: 3px solid {primary_dark};
+    }}
+
+    /* ===== ScrollBar ===== */
+    QScrollBar:vertical {{
+        background-color: {app_bg};
+        width: 10px;
+        border-radius: 5px;
+        margin: 0px;
+    }}
+    QScrollBar::handle:vertical {{
+        background-color: {border};
+        border-radius: 5px;
+        min-height: 30px;
+    }}
+    QScrollBar::handle:vertical:hover {{
+        background-color: {text_muted};
+    }}
+    QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+        height: 0px;
+    }}
+    QScrollBar:horizontal {{
+        background-color: {app_bg};
+        height: 10px;
+        border-radius: 5px;
+    }}
+    QScrollBar::handle:horizontal {{
+        background-color: {border};
+        border-radius: 5px;
+        min-width: 30px;
+    }}
+    QScrollBar::handle:horizontal:hover {{
+        background-color: {text_muted};
+    }}
+    QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
+        width: 0px;
+    }}
+
+    /* ===== CheckBox / RadioButton ===== */
+    QCheckBox, QRadioButton {{
+        color: {text_main};
+        spacing: 8px;
+    }}
+    QCheckBox::indicator, QRadioButton::indicator {{
+        width: 18px;
+        height: 18px;
+        border: 1px solid {border};
+        border-radius: 4px;
+        background-color: {card_bg};
+    }}
+    QCheckBox::indicator:checked {{
+        background-color: {primary};
+        border-color: {primary};
+    }}
+    QRadioButton::indicator {{
+        border-radius: 9px;
+    }}
+    QRadioButton::indicator:checked {{
+        background-color: {primary};
+        border-color: {primary};
+    }}
+
+    /* ===== SpinBox / DoubleSpinBox ===== */
+    QSpinBox, QDoubleSpinBox {{
+        background-color: {card_bg};
+        color: {text_main};
+        border: 1px solid {border};
+        border-radius: {RADIUS_DEFAULT}px;
+        padding: 8px 12px;
+        font-family: "{font_family}";
+        font-size: {font_size}px;
+    }}
+    QSpinBox:focus, QDoubleSpinBox:focus {{
+        border-color: {primary};
+    }}
+
+    /* ===== ToolTip ===== */
+    QToolTip {{
+        background-color: {card_bg};
+        color: {text_main};
+        border: 1px solid {border};
+        border-radius: 6px;
+        padding: 6px 10px;
+    }}
+
+    /* ===== Separator / Line ===== */
+    QFrame[frameShape="4"], QFrame[frameShape="5"] {{
+        background-color: {border};
+    }}
+
+    /* ===== Glassmorphism Cards ===== */
+    QFrame#glass_card {{
+        background-color: {glass_card};
+        border: 1px solid {border};
+        border-radius: {RADIUS_LARGE}px;
+    }}
+    QFrame#card {{
+        background-color: {card_bg};
+        border: 1px solid {border};
+        border-radius: {RADIUS_DEFAULT}px;
+    }}
+
+    /* ===== Status Badge ===== */
+    QLabel#badge {{
+        background-color: {primary};
+        color: #FFFFFF;
+        border-radius: 12px;
+        padding: 4px 12px;
+        font-size: 9px;
+        font-weight: 700;
+    }}
+    """
+
+
+def setup_theme(root=None, theme_name="litera", is_dark=False):
+    """Setup application-wide premium theme. Safe to call multiple times.
+
+    Args:
+        root: The main window (QMainWindow or QWidget)
+        theme_name: Ignored in PySide6 (kept for API compatibility)
+        is_dark: Boolean to enable dark mode
+    """
+    global _current_theme
+
+    # Update theme state
+    if is_dark is True:
+        _current_theme = "dark"
+    elif is_dark is False:
+        _current_theme = "light"
+
+    active_is_dark = (_current_theme == "dark")
+
+    # Build and apply QSS stylesheet
+    stylesheet = _build_stylesheet(active_is_dark)
+
+    app = QtWidgets.QApplication.instance()
+    if app is not None:
+        app.setStyleSheet(stylesheet)
+        logging.info("QSS stylesheet applied (dark=%s)", active_is_dark)
+
+    # Set root window palette/background if provided
+    if root is not None:
+        app_bg = get_color('app_bg')
+        palette = root.palette()
+        palette.setColor(QtGui.QPalette.Window, QtGui.QColor(app_bg))
+        palette.setColor(QtGui.QPalette.WindowText, QtGui.QColor(get_color('text_main')))
+        palette.setColor(QtGui.QPalette.Base, QtGui.QColor(get_color('card_bg')))
+        palette.setColor(QtGui.QPalette.Text, QtGui.QColor(get_color('text_main')))
+        palette.setColor(QtGui.QPalette.Button, QtGui.QColor(get_color('primary')))
+        palette.setColor(QtGui.QPalette.ButtonText, QtGui.QColor("#FFFFFF"))
+        palette.setColor(QtGui.QPalette.Highlight, QtGui.QColor(get_color('primary')))
+        palette.setColor(QtGui.QPalette.HighlightedText, QtGui.QColor("#FFFFFF"))
+        root.setPalette(palette)
+        root.setAutoFillBackground(True)
 
 
 def switch_theme(is_dark=None):
     """Switch between light and dark mode at runtime.
-    
+
     Args:
         is_dark: If True, switch to dark mode. If False, switch to light.
                  If None, toggle current mode.
-    
+
     Returns:
         bool: True if successful, False otherwise
     """
     global _current_theme
-    
+
     if is_dark is None:
         # Toggle current theme
         is_dark = (_current_theme != "dark")
-    
+
     # Update theme state
     set_current_theme("dark" if is_dark else "light")
-    
-    # Re-setup theme with new colors
-    # Note: This requires access to the root window which should be passed by caller
+
     logging.info("Theme switched to: %s", "dark" if is_dark else "light")
     return True
 
 
 def toggle_theme(root=None):
     """Toggle between light and dark mode and update UI.
-    
+
     Args:
         root: The root window to update
-    
+
     Returns:
         bool: True if switched to dark, False if switched to light
     """
     global _current_theme
-    
+
     # Toggle
     is_dark = (_current_theme != "dark")
     _current_theme = "dark" if is_dark else "light"
-    
-    # Update root window background
+
+    # Update root window palette
     if root is not None:
         app_bg = get_color('app_bg')
-        try:
-            root.configure(bg=app_bg)
-        except Exception:
-            pass
-        
+        palette = root.palette()
+        palette.setColor(QtGui.QPalette.Window, QtGui.QColor(app_bg))
+        root.setPalette(palette)
+
         # Re-apply theme styles
         setup_theme(root=root, is_dark=is_dark)
-    
+
     logging.info("Theme toggled to: %s", "dark" if is_dark else "light")
     return is_dark
 
 
-def is_bootstrap():
-    return USING_BOOTSTRAP
+def detect_system_theme():
+    """Detect system dark/light mode using Qt palette."""
+    app = QtWidgets.QApplication.instance()
+    if app is None:
+        return "light"
+    palette = app.palette()
+    window_text = palette.color(QtGui.QPalette.WindowText)
+    # If text is lighter than background, system is likely dark
+    window_bg = palette.color(QtGui.QPalette.Window)
+    return "dark" if window_text.lightness() > window_bg.lightness() else "light"
 
 
-def frame(master, **kwargs):
-    if USING_BOOTSTRAP and tb is not None:
-        return tb.Frame(master, **kwargs)
-    return ttk.Frame(master, **kwargs)
+def _make_font(font_tuple):
+    """Convert a font tuple (family, size, weight) to QtGui.QFont."""
+    if isinstance(font_tuple, tuple) and len(font_tuple) >= 2:
+        family = font_tuple[0]
+        size = font_tuple[1]
+        weight = font_tuple[2] if len(font_tuple) > 2 else 400  # 400 = normal
+        font = QtGui.QFont(family, size)
+        font.setBold(weight >= 700)
+        return font
+    return QtGui.QFont()
 
 
-def label(master, text, kind="regular", **kwargs):
-    if USING_BOOTSTRAP and tb is not None:
-        boot = None
-        if kind == 'heading':
-            boot = 'primary'
-        try:
-            return tb.Label(master, text=text, bootstyle=boot, **kwargs)
-        except Exception:
-            pass
-    return styled_label(master, text, kind=kind, **kwargs)
+def styled_label(parent, text="", kind="regular", **kwargs):
+    """Create a QLabel with premium theme fonts applied."""
+    lbl = QtWidgets.QLabel(text, parent, **kwargs)
+
+    # Determine font based on kind
+    if kind == "heading":
+        font = FONT_HEADING
+        lbl.setObjectName("heading")
+    elif kind == "subheading":
+        font = SUBHEADING_FONT
+        lbl.setObjectName("subheading")
+    elif kind == "large":
+        font = FONT_LARGE
+    elif kind == "bold":
+        font = FONT_BOLD
+    elif kind == "small":
+        font = FONT_SMALL
+    elif kind == "muted":
+        font = FONT_REGULAR
+        lbl.setObjectName("muted")
+    else:
+        font = FONT_REGULAR
+
+    lbl.setFont(_make_font(font))
+    return lbl
 
 
-def entry(master, **kwargs):
-    if USING_BOOTSTRAP and tb is not None:
-        try:
-            return tb.Entry(master, **kwargs)
-        except Exception:
-            pass
-    return styled_entry(master, **kwargs)
+def styled_entry(parent, text="", **kwargs):
+    """Create a QLineEdit with premium theme styling."""
+    entry = QtWidgets.QLineEdit(parent, **kwargs)
+    entry.setText(text)
+    entry.setFont(_make_font(FONT_REGULAR))
+    return entry
 
 
-def combobox(master, **kwargs):
-    if USING_BOOTSTRAP and tb is not None:
-        try:
-            return tb.Combobox(master, **kwargs)
-        except Exception:
-            pass
-    return ttk.Combobox(master, **kwargs)
+def make_button(parent, text="", slot=None, kind="primary", icon=None, **kwargs):
+    """Create a premium themed button with optional icon."""
+    btn = QtWidgets.QPushButton(text, parent, **kwargs)
+
+    # Apply object name for QSS targeting
+    kind_map = {
+        "primary": "",
+        "success": "success",
+        "danger": "danger",
+        "secondary": "secondary",
+        "info": "info",
+        "warning": "warning",
+        "card": "success",
+    }
+    obj_name = kind_map.get(kind, "")
+    if obj_name:
+        btn.setObjectName(obj_name)
+
+    if icon is not None:
+        if isinstance(icon, QtGui.QIcon):
+            btn.setIcon(icon)
+        elif isinstance(icon, str):
+            btn.setIcon(QtGui.QIcon(icon))
+
+    if slot is not None:
+        btn.clicked.connect(slot)
+
+    btn.setFont(_make_font(FONT_BOLD))
+    return btn
 
 
-def treeview(master, **kwargs):
-    if USING_BOOTSTRAP and tb is not None:
-        try:
-            return tb.Treeview(master, **kwargs)
-        except Exception:
-            pass
-    return ttk.Treeview(master, **kwargs)
+def make_card(parent, padding=None, elevation="default", **kwargs):
+    """Create a premium card frame with glassmorphism effect."""
+    card = QtWidgets.QFrame(parent, **kwargs)
+    card.setObjectName("card")
+    card.setFrameShape(QtWidgets.QFrame.StyledPanel)
+
+    if padding is not None:
+        if isinstance(padding, int):
+            card.setContentsMargins(padding, padding, padding, padding)
+        elif isinstance(padding, (list, tuple)) and len(padding) == 4:
+            card.setContentsMargins(*padding)
+        elif isinstance(padding, (list, tuple)) and len(padding) == 2:
+            card.setContentsMargins(padding[0], padding[1], padding[0], padding[1])
+
+    return card
 
 
-def get_palette():
-    """Get current theme palette (theme-aware)."""
-    return {
-        "app_bg": get_color('app_bg'),
-        "card_bg": get_color('card_bg'),
-        "border": get_color('border'),
+def make_glass_card(parent, padding=None, **kwargs):
+    """Create a glassmorphism-style card with semi-transparent background."""
+    card = QtWidgets.QFrame(parent, **kwargs)
+    card.setObjectName("glass_card")
+    card.setFrameShape(QtWidgets.QFrame.StyledPanel)
+
+    if padding is not None:
+        if isinstance(padding, int):
+            card.setContentsMargins(padding, padding, padding, padding)
+        elif isinstance(padding, (list, tuple)) and len(padding) == 4:
+            card.setContentsMargins(*padding)
+        elif isinstance(padding, (list, tuple)) and len(padding) == 2:
+            card.setContentsMargins(padding[0], padding[1], padding[0], padding[1])
+
+    return card
+
+
+def create_divider(parent, orientation="horizontal", **kwargs):
+    """Create a premium divider line."""
+    if orientation == "horizontal":
+        line = QtWidgets.QFrame(parent, **kwargs)
+        line.setFrameShape(QtWidgets.QFrame.HLine)
+        line.setFrameShadow(QtWidgets.QFrame.Sunken)
+    else:
+        line = QtWidgets.QFrame(parent, **kwargs)
+        line.setFrameShape(QtWidgets.QFrame.VLine)
+        line.setFrameShadow(QtWidgets.QFrame.Sunken)
+
+    return line
+
+
+def create_badge(parent, text, kind="primary", **kwargs):
+    """Create a premium badge/pill component."""
+    badge = QtWidgets.QLabel(text, parent, **kwargs)
+    badge.setObjectName("badge")
+    badge.setFont(_make_font(FONT_SMALL))
+    badge.setAlignment(QtCore.Qt.AlignCenter)
+
+    # Set inline style for badge color
+    colors = {
         "primary": get_color('primary'),
-        "primary_light": get_color('primary_light'),
-        "primary_dark": get_color('primary_dark'),
-        "muted": get_color('text_muted'),
-        "text": get_color('text_main'),
         "success": get_color('success'),
         "danger": get_color('danger'),
         "warning": get_color('warning'),
         "info": get_color('info'),
-        "glass_bg": get_color('glass_bg'),
-        "shadow": SHADOW_DEFAULT,
-        "is_dark": (_current_theme == "dark"),
+        "secondary": get_color('secondary'),
     }
+    bg_color = colors.get(kind, colors["primary"])
+    badge.setStyleSheet(f"""
+        QLabel {{
+            background-color: {bg_color};
+            color: #FFFFFF;
+            border-radius: 12px;
+            padding: 4px 12px;
+            font-size: 9px;
+            font-weight: 700;
+        }}
+    """)
+
+    return badge
 
 
-def center_window(win, width=None, height=None):
-    try:
-        win.update_idletasks()
-        if width is None:
-            width = win.winfo_width()
-        if height is None:
-            height = win.winfo_height()
-        ws = win.winfo_screenwidth()
-        hs = win.winfo_screenheight()
-        x = (ws // 2) - (width // 2)
-        y = (hs // 2) - (height // 2)
-        win.geometry(f"{width}x{height}+{x}+{y}")
-    except Exception:
-        pass
-
-
-def styled_label(master, text="", kind="regular", **kwargs):
-    """Create a ttk.Label with premium theme fonts applied."""
-    # POP internal arguments that ttk.Label doesn't support
-    font = kwargs.pop('font', None)
-    size = kwargs.pop('size', None)
-    bold = kwargs.pop('bold', False)
-    
-    if font is None:
-        if kind == "heading":
-            font = FONT_HEADING
-        elif kind == "subheading":
-            font = SUBHEADING_FONT
-        elif kind == "large":
-            font = FONT_LARGE
-        elif kind == "bold":
-            font = FONT_BOLD
-        elif kind == "small":
-            font = FONT_SMALL
-        else:
-            font = FONT_REGULAR
-    
-    # If size or bold is explicitly requested, override the font
-    if size or bold:
-        # Assuming font is (family, size, weight)
-        if isinstance(font, tuple) and len(font) >= 2:
-            f_family = font[0]
-            f_size = size if size else font[1]
-            f_weight = "bold" if bold else (font[2] if len(font) > 2 else "normal")
-            font = (f_family, f_size, f_weight)
-        elif isinstance(font, str):
-            # If it's a font name, try to modify it or just use family
-            f_size = size if size else 10
-            f_weight = "bold" if bold else "normal"
-            font = (font, f_size, f_weight)
-
-    lbl = ttk.Label(master, text=text, font=font, **kwargs)
-    return lbl
-
-
-def styled_entry(master, **kwargs):
-    e = ttk.Entry(master, **kwargs)
-    try:
-        e.configure(font=FONT_REGULAR)
-    except Exception:
-        pass
-    return e
-
-
-def make_button(master, text="", command=None, kind="primary", icon="", **kwargs):
-    """Return a premium themed button with optional icon."""
-    # POP internal arguments that ttk.Button doesn't support
-    font = kwargs.pop('font', FONT_REGULAR)
-    size = kwargs.pop('size', None)
-    bold = kwargs.pop('bold', False)
-    width_val = kwargs.pop('width', None)
-    
-    # If size or bold is explicitly requested, override the font
-    if size or bold:
-        if isinstance(font, tuple) and len(font) >= 2:
-            f_family = font[0]
-            f_size = size if size else font[1]
-            f_weight = "bold" if bold else (font[2] if len(font) > 2 else "normal")
-            font = (f_family, f_size, f_weight)
-        elif isinstance(font, str):
-            f_size = size if size else 10
-            f_weight = "bold" if bold else "normal"
-            font = (font, f_size, f_weight)
-
-    btn_text = f"{icon} {text}" if icon else text
-    
-    if USING_BOOTSTRAP and tb is not None:
-        boot_map = {
-            "primary": "primary",
-            "success": "success",
-            "danger": "danger",
-            "secondary": "secondary",
-            "info": "info",
-            "warning": "warning",
-            "card": "success"
-        }
-        boot = boot_map.get(kind, "primary")
-        
-        try:
-            # Create button with bootstyle
-            btn = tb.Button(master, text=btn_text, command=command, bootstyle=boot, **kwargs)
-            # Re-apply font if specified
-            if font:
-                try:
-                    btn.configure(font=font)
-                except Exception:
-                    logging.debug("Failed to set button font")
-            if width_val:
-                try:
-                    btn.configure(width=width_val)
-                except Exception:
-                    logging.debug("Failed to set button width")
-            return btn
-        except Exception as e:
-            logging.debug(f"Bootstrap button creation failed: {e}")
-
-    # Fallback to standard themed button with manual style mapping
-    style_map = {
-        "primary": "Primary.TButton",
-        "success": "Success.TButton",
-        "danger": "Danger.TButton",
-        "secondary": "Secondary.TButton",
-        "info": "Info.TButton",
-        "warning": "Warning.TButton",
-        "card": "Success.TButton"
-    }
-    style = style_map.get(kind, "Primary.TButton")
-    
-    btn = ttk.Button(master, text=btn_text, command=command, style=style, **kwargs)
-    try:
-        btn.configure(font=font)
-    except Exception:
-        logging.debug("Failed to set button font")
-    if width_val:
-        try:
-            btn.configure(width=width_val)
-        except Exception:
-            logging.debug("Failed to set button width")
-    return btn
-
-
-def make_card(master, padding_val=None, elevation="default", **kwargs):
-    """Create a premium card with glassmorphism effect (theme-aware)."""
-    # Handle 'padding' passed via kwargs (e.g. make_card(parent, padding=12))
-    if 'padding' in kwargs:
-        padding_val = kwargs.pop('padding')
-    
-    if padding_val is None:
-        px = kwargs.pop("padx", 20)
-        py = kwargs.pop("pady", 20)
-        padding_val = (px, py)
-    else:
-        px = kwargs.pop("padx", 0)
-        py = kwargs.pop("pady", 0)
-        # If padding_val is a single int, use it for both padx/pady
-        if isinstance(padding_val, int):
-            px = padding_val
-            py = padding_val
-
-    # Get theme-aware colors
-    card_bg = get_color('card_bg')
-    border = get_color('border')
-
-    if USING_BOOTSTRAP and tb is not None:
-        return tb.Frame(master, bootstyle="default", padding=padding_val, **kwargs)
-    else:
-        # Premium card with subtle border and shadow simulation
-        card_frame = tk.Frame(master, bg=card_bg, 
-                             highlightbackground=border, 
-                             highlightthickness=1,
-                             padx=px, pady=py, **kwargs)
-        return card_frame
-
-
-def make_glass_card(master, padding_val=None, **kwargs):
-    """Create a glassmorphism-style card with semi-transparent background (theme-aware)."""
-    if padding_val is None:
-        px = kwargs.pop("padx", 24)
-        py = kwargs.pop("pady", 24)
-        padding_val = (px, py)
-    else:
-        px = kwargs.pop("padx", 0)
-        py = kwargs.pop("pady", 0)
-    
-    # Get theme-aware colors
-    card_bg = get_color('card_bg')
-    border = get_color('border')
-    
-    # Glass card with lighter border for ethereal effect
-    glass_frame = tk.Frame(master, bg=card_bg,
-                          highlightbackground=border,
-                          highlightthickness=1,
-                          padx=px, pady=py, **kwargs)
-    return glass_frame
-
-
-def create_divider(master, orientation="horizontal", **kwargs):
-    """Create a premium divider line (theme-aware)."""
-    color = kwargs.pop("color", get_color('border'))
-    thickness = kwargs.pop("thickness", 1)
-    
-    if orientation == "horizontal":
-        divider = tk.Frame(master, bg=color, height=thickness, **kwargs)
-    else:
-        divider = tk.Frame(master, bg=color, width=thickness, **kwargs)
-    
-    return divider
-
-
-def create_badge(master, text, kind="primary", **kwargs):
-    """Create a premium badge/pill component (theme-aware)."""
-    # Theme-aware colors
-    colors = {
-        "primary": (get_color('primary'), "#FFFFFF"),
-        "success": (get_color('success'), "#FFFFFF"),
-        "danger": (get_color('danger'), "#FFFFFF"),
-        "warning": (get_color('warning'), "#FFFFFF"),
-        "info": (get_color('info'), "#FFFFFF"),
-        "secondary": (get_color('secondary'), "#FFFFFF"),
-    }
-    
-    bg, fg = colors.get(kind, colors["primary"])
-    
-    badge_frame = tk.Frame(master, bg=bg, padx=12, pady=4, **kwargs)
-    label = tk.Label(badge_frame, text=text, font=FONT_SMALL, bg=bg, fg=fg, bd=0)
-    label.pack()
-    
-    return badge_frame
-
-
-def create_status_badge(master, text, icon="", color=None, **kwargs):
+def create_status_badge(parent, text, icon="", color=None, **kwargs):
     """Create a more descriptive status badge with an icon and custom color."""
     bg = color if color else get_color('primary')
-    fg = "#FFFFFF"
-    
-    badge_frame = tk.Frame(master, bg=bg, padx=15, pady=6, **kwargs)
-    
     display_text = f"{icon} {text}" if icon else text
-    label = tk.Label(badge_frame, text=display_text, font=FONT_BOLD, bg=bg, fg=fg, bd=0)
-    label.pack()
-    
-    return badge_frame
+
+    badge = QtWidgets.QLabel(display_text, parent, **kwargs)
+    badge.setFont(_make_font(FONT_BOLD))
+    badge.setAlignment(QtCore.Qt.AlignCenter)
+    badge.setStyleSheet(f"""
+        QLabel {{
+            background-color: {bg};
+            color: #FFFFFF;
+            border-radius: 12px;
+            padding: 6px 15px;
+        }}
+    """)
+
+    return badge
+
+
+def create_table(parent, columns, **kwargs):
+    """Create a premium themed table/tree view.
+
+    Args:
+        parent: Parent widget
+        columns: List of column header strings
+        **kwargs: Additional kwargs passed to QTreeView
+
+    Returns:
+        QTreeView with model configured
+    """
+    view = QtWidgets.QTreeView(parent, **kwargs)
+    view.setUniformRowHeights(True)
+    view.setAlternatingRowColors(True)
+    view.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+    view.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+    view.setSortingEnabled(True)
+    view.setFont(_make_font(FONT_REGULAR))
+
+    # Set header labels
+    model = QtGui.QStandardItemModel(0, len(columns), parent)
+    model.setHorizontalHeaderLabels(columns)
+    view.setModel(model)
+
+    # Resize header to fit
+    header = view.header()
+    header.setStretchLastSection(True)
+    header.setMinimumSectionSize(80)
+
+    return view
 
 
 def animate_hover(widget, on_enter, on_leave):
-    """Add hover animation to a widget."""
-    def enter_handler(e):
+    """Add hover animation to a widget using Qt event filters.
+
+    Args:
+        widget: The Qt widget to add hover effects to
+        on_enter: Callable to invoke on hover enter
+        on_leave: Callable to invoke on hover leave
+    """
+    widget.setMouseTracking(True)
+
+    original_enter = widget.enterEvent
+    original_leave = widget.leaveEvent
+
+    def new_enter(event):
         on_enter()
+        if callable(original_enter):
+            original_enter(event)
 
-    def leave_handler(e):
+    def new_leave(event):
         on_leave()
+        if callable(original_leave):
+            original_leave(event)
 
-    widget.bind("<Enter>", enter_handler)
-    widget.bind("<Leave>", leave_handler)
+    widget.enterEvent = new_enter
+    widget.leaveEvent = new_leave
+
+
+def apply_property(widget, prop_name, value):
+    """Set a Qt dynamic property on a widget and update style."""
+    widget.setProperty(prop_name, value)
+    widget.style().unpolish(widget)
+    widget.style().polish(widget)
 
 
 # ============================================
 # STANDARD BUTTON WIDTHS FOR CONSISTENCY
 # ============================================
-# Use these constants for uniform button sizes across the app
+# Qt uses fixed widths in pixels rather than character widths
 BTN_WIDTH = {
-    'xs': 8,      # Extra small - icons, close buttons
-    'sm': 10,     # Small - secondary actions
-    'md': 14,     # Medium - standard buttons
-    'lg': 18,     # Large - primary actions
-    'xl': 22,     # Extra large - prominent actions
-    'action': 15, # Standard action button
-    'dialog': 14, # Dialog buttons (Cancel/Save/etc)
+    'xs': 32,      # Extra small - icons, close buttons
+    'sm': 80,      # Small - secondary actions
+    'md': 120,     # Medium - standard buttons
+    'lg': 160,     # Large - primary actions
+    'xl': 200,     # Extra large - prominent actions
+    'action': 130, # Standard action button
+    'dialog': 120, # Dialog buttons (Cancel/Save/etc)
 }
 
 
 # ============================================
 # BACKWARDS COMPATIBILITY ALIASES
 # ============================================
-def label(master, text="", **kwargs):
-    return styled_label(master, text, **kwargs)
+def label(parent, text="", **kwargs):
+    return styled_label(parent, text, **kwargs)
 
-def entry(master, **kwargs):
-    return styled_entry(master, **kwargs)
 
-def frame(master, **kwargs):
-    return make_card(master, **kwargs)
+def entry(parent, text="", **kwargs):
+    return styled_entry(parent, text, **kwargs)
 
-def combobox(master, **kwargs):
-    cb = ttk.Combobox(master, **kwargs)
-    try:
-        cb.configure(font=FONT_REGULAR)
-    except Exception:
-        logging.debug("Failed to set combobox font")
+
+def frame(parent, **kwargs):
+    return make_card(parent, **kwargs)
+
+
+def combobox(parent, items=None, **kwargs):
+    """Create a styled QComboBox."""
+    cb = QtWidgets.QComboBox(parent, **kwargs)
+    cb.setFont(_make_font(FONT_REGULAR))
+    if items is not None:
+        cb.addItems(items)
     return cb
 
-def treeview(master, **kwargs):
-    tv = ttk.Treeview(master, **kwargs)
-    try:
-        style = ttk.Style()
-        style.configure("Treeview", font=FONT_REGULAR)
-    except Exception:
-        logging.debug("Failed to configure Treeview style")
-    return tv
 
+def treeview(parent, **kwargs):
+    """Create a styled QTreeView."""
+    tv = QtWidgets.QTreeView(parent, **kwargs)
+    tv.setFont(_make_font(FONT_REGULAR))
+    tv.setUniformRowHeights(True)
+    return tv

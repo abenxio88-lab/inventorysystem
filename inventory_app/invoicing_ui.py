@@ -5,8 +5,7 @@ UI-ONLY layer. All data goes through the service layer.
 After every write, refresh_from_db() reloads fresh data.
 """
 
-import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+from PySide6 import QtWidgets, QtCore, QtGui
 import logging
 import os
 from datetime import datetime, timedelta
@@ -26,21 +25,32 @@ logger = logging.getLogger(__name__)
 
 def create_invoicing_tab(parent, current_user=None):
     """Creates the comprehensive invoicing tab."""
-    window = ttk.Frame(parent, padding=15)
+    window = QtWidgets.QWidget()
+    main_layout = QtWidgets.QVBoxLayout(window)
+    main_layout.setContentsMargins(15, 15, 15, 15)
+    main_layout.setSpacing(10)
 
     # Header
-    header_frame = ttk.Frame(window)
-    header_frame.pack(fill="x", pady=(0, 15))
-    styled_label(header_frame, "📄 Invoice Management", font=FONT_HEADING).pack(side=tk.LEFT)
+    header_frame = QtWidgets.QWidget()
+    header_layout = QtWidgets.QHBoxLayout(header_frame)
+    header_layout.setContentsMargins(0, 0, 0, 15)
+    styled_label(header_frame, "Invoice Management", font=FONT_HEADING)
+    header_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft)
+    main_layout.addWidget(header_frame)
 
     def open_new_invoice():
         _open_create_invoice_dialog(window, current_user=current_user)
 
-    make_button(header_frame, "➕ New Invoice", command=open_new_invoice, kind="success").pack(side=tk.RIGHT)
+    new_btn = make_button(header_frame, "New Invoice", command=open_new_invoice, kind="success")
+    header_layout.addStretch()
+    header_layout.addWidget(new_btn)
 
     # Summary cards
-    summary_frame = ttk.Frame(window)
-    summary_frame.pack(fill="x", pady=(0, 15))
+    summary_frame = QtWidgets.QWidget()
+    summary_layout = QtWidgets.QHBoxLayout(summary_frame)
+    summary_layout.setContentsMargins(0, 0, 0, 15)
+    summary_layout.setSpacing(8)
+    main_layout.addWidget(summary_frame)
 
     def _update_summary():
         invoices = svc.invoice.get_all_invoices()
@@ -53,45 +63,50 @@ def create_invoicing_tab(parent, current_user=None):
             if status in counts:
                 counts[status] += 1
 
-        widgets = _summary_widgets
-        widgets["total"].config(text=f"Rs. {total:,.2f}")
-        widgets["paid"].config(text=f"Rs. {paid:,.2f}")
-        widgets["pending"].config(text=f"Rs. {pending:,.2f}")
-        widgets["count_pending"].config(text=str(counts["pending"]))
-        widgets["count_paid"].config(text=str(counts["paid"]))
+        _summary_widgets["total"].setText(f"Rs. {total:,.2f}")
+        _summary_widgets["paid"].setText(f"Rs. {paid:,.2f}")
+        _summary_widgets["pending"].setText(f"Rs. {pending:,.2f}")
+        _summary_widgets["count_pending"].setText(str(counts["pending"]))
+        _summary_widgets["count_paid"].setText(str(counts["paid"]))
 
     _summary_widgets = {}
-    for i, (title, key) in enumerate([
+    for title, key in [
         ("Total Invoiced", "total"), ("Total Paid", "paid"),
         ("Outstanding", "pending"), ("Pending Count", "count_pending"), ("Paid Count", "count_paid")
-    ]):
+    ]:
         card = make_card(summary_frame, padding=12)
-        card.grid(row=0, column=i, padx=8, sticky="nsew")
-        styled_label(card, text=title, font=("Segoe UI", 9), foreground="#6c757d").pack(anchor="w")
+        card_layout = QtWidgets.QVBoxLayout(card)
+        card_layout.setContentsMargins(8, 8, 8, 8)
+        title_lbl = styled_label(card, text=title, font=("Segoe UI", 9), foreground="#6c757d")
+        card_layout.addWidget(title_lbl)
         val = styled_label(card, text="...", font=("Segoe UI", 18, "bold"), foreground=COLOR_PRIMARY)
-        val.pack(anchor="w", pady=(3, 0))
+        card_layout.addWidget(val)
+        card_layout.addStretch()
+        summary_layout.addWidget(card)
         _summary_widgets[key] = val
-    summary_frame.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
 
     # Filter toolbar
-    toolbar = ttk.Frame(window)
-    toolbar.pack(fill="x", pady=(0, 10))
-    styled_label(toolbar, "Status:").pack(side=tk.LEFT, padx=(0, 5))
-    status_var = tk.StringVar(value="All")
-    status_cb = combobox(toolbar, values=["All", "pending", "paid", "overdue"],
-                         textvariable=status_var, state="readonly")
-    status_cb.pack(side=tk.LEFT, padx=(0, 10))
+    toolbar = QtWidgets.QWidget()
+    toolbar_layout = QtWidgets.QHBoxLayout(toolbar)
+    toolbar_layout.setContentsMargins(0, 0, 0, 10)
+    main_layout.addWidget(toolbar)
+
+    styled_label(toolbar, "Status:")
+    status_cb = QtWidgets.QComboBox()
+    status_cb.addItems(["All", "pending", "paid", "overdue"])
+    toolbar_layout.addWidget(status_cb, stretch=0)
 
     refresh_btn = make_button(toolbar, "Refresh", kind="primary")
-    refresh_btn.pack(side=tk.LEFT)
+    toolbar_layout.addWidget(refresh_btn)
+    toolbar_layout.addStretch()
 
     # Table
     table_frame = make_card(window, padx=10, pady=10)
-    table_frame.pack(fill="both", expand=True)
+    table_layout = QtWidgets.QHBoxLayout(table_frame)
+    table_layout.setContentsMargins(0, 0, 0, 0)
+    main_layout.addWidget(table_frame)
 
     columns = ("number", "customer", "date", "due_date", "total", "paid", "status")
-    tree = ttk.Treeview(table_frame, columns=columns, show="headings")
-
     column_map = {
         "number": ("Invoice #", 120),
         "customer": ("Customer", 150),
@@ -102,21 +117,18 @@ def create_invoicing_tab(parent, current_user=None):
         "status": ("Status", 80),
     }
 
-    for col, (label_text, width) in column_map.items():
-        tree.heading(col, text=label_text.upper(), anchor="w")
-        tree.column(col, width=width, anchor="w")
+    tree = QtWidgets.QTableWidget()
+    tree.setColumnCount(len(columns))
+    tree.setHorizontalHeaderLabels([column_map[c][0].upper() for c in columns])
+    tree.horizontalHeader().setStretchLastSection(True)
+    tree.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Interactive)
+    tree.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+    tree.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
 
-    scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tree.yview)
-    tree.configure(yscrollcommand=scrollbar.set)
-    scrollbar.pack(side="right", fill="y")
-    tree.pack(side="left", fill="both", expand=True)
+    for i, col in enumerate(columns):
+        tree.setColumnWidth(i, column_map[col][1])
 
-    try:
-        style = ttk.Style()
-        style.configure("Treeview", font=FONT_REGULAR, rowheight=28)
-        style.configure("Treeview.Heading", font=FONT_BOLD)
-    except Exception:
-        pass
+    table_layout.addWidget(tree)
 
     # ========================================================
     #  SINGLE SOURCE OF TRUTH: refresh_from_db()
@@ -125,40 +137,40 @@ def create_invoicing_tab(parent, current_user=None):
     def refresh_from_db():
         """Reload invoices and update summary."""
         _update_summary()
-        tree.delete(*tree.get_children())
+        tree.setRowCount(0)
 
-        status_filter = status_var.get()
+        status_filter = status_cb.currentText()
         invoices = svc.invoice.get_all_invoices(
             status=None if status_filter == "All" else status_filter
         )
 
-        for inv in invoices:
-            tree.insert("", "end", values=(
-                inv.get("invoice_number", ""),
-                inv.get("customer_name", ""),
-                inv.get("invoice_date", "")[:10],
-                inv.get("due_date", "")[:10],
-                f"{inv.get('total_amount', 0):,.2f}",
-                f"{inv.get('amount_paid', 0):,.2f}",
-                inv.get("status", ""),
-            ))
+        for row_idx, inv in enumerate(invoices):
+            tree.insertRow(row_idx)
+            tree.setItem(row_idx, 0, QtWidgets.QTableWidgetItem(inv.get("invoice_number", "")))
+            tree.setItem(row_idx, 1, QtWidgets.QTableWidgetItem(inv.get("customer_name", "")))
+            tree.setItem(row_idx, 2, QtWidgets.QTableWidgetItem(inv.get("invoice_date", "")[:10]))
+            tree.setItem(row_idx, 3, QtWidgets.QTableWidgetItem(inv.get("due_date", "")[:10]))
+            tree.setItem(row_idx, 4, QtWidgets.QTableWidgetItem(f"{inv.get('total_amount', 0):,.2f}"))
+            tree.setItem(row_idx, 5, QtWidgets.QTableWidgetItem(f"{inv.get('amount_paid', 0):,.2f}"))
+            tree.setItem(row_idx, 6, QtWidgets.QTableWidgetItem(inv.get("status", "")))
 
-    # Now wire the combobox and button (after refresh_from_db is defined)
-    status_cb.bind("<<ComboboxSelected>>", lambda e: refresh_from_db())
-    refresh_btn.config(command=refresh_from_db)
+    # Wire the combobox and button
+    status_cb.currentTextChanged.connect(lambda _: refresh_from_db())
+    refresh_btn.clicked.connect(refresh_from_db)
 
     # Double-click to view/pay
     def on_double_click(event):
-        sel = tree.selection()
-        if not sel:
+        selected_rows = tree.selectionModel().selectedRows()
+        if not selected_rows:
             return
-        inv_number = tree.item(sel[0], "values")[0]
+        row = selected_rows[0].row()
+        inv_number = tree.item(row, 0).text()
         invoices = svc.invoice.get_all_invoices()
         inv = next((i for i in invoices if i.get("invoice_number") == inv_number), None)
         if inv:
             _open_invoice_detail(window, inv, current_user=current_user, on_refresh=refresh_from_db)
 
-    tree.bind("<Double-1>", on_double_click)
+    tree.doubleClicked.connect(on_double_click)
 
     # Initial load
     refresh_from_db()
@@ -167,73 +179,73 @@ def create_invoicing_tab(parent, current_user=None):
 
 def _open_create_invoice_dialog(master, current_user=None):
     """Dialog to create a new invoice."""
-    dlg = tk.Toplevel(master)
-    dlg.title("New Invoice")
-    dlg.geometry("600x550")
-    dlg.transient(master)
-    dlg.grab_set()
+    dlg = QtWidgets.QDialog(master)
+    dlg.setWindowTitle("New Invoice")
+    dlg.resize(600, 550)
+    dlg.setModal(True)
+
+    layout = QtWidgets.QVBoxLayout(dlg)
+    layout.setContentsMargins(10, 10, 10, 10)
 
     form_card = make_card(dlg, padx=20, pady=20)
-    form_card.pack(fill="both", expand=True, padx=10, pady=10)
+    form_layout = QtWidgets.QFormLayout(form_card)
+    form_layout.setSpacing(10)
+    layout.addWidget(form_card)
 
     # Customer selection
-    label(form_card, "Customer Name", kind="bold").grid(row=0, column=0, sticky="w", pady=5, padx=5)
-    customer_var = tk.StringVar()
+    customer_var = ""
     customers = svc.customer.get_all_customers()
     customer_names = [c.get("name", "") for c in customers if c.get("name")]
-    customer_cb = combobox(form_card, values=customer_names, textvariable=customer_var, state="readonly")
-    customer_cb.grid(row=0, column=1, sticky="ew", pady=5, padx=5)
+
+    customer_cb = QtWidgets.QComboBox()
+    customer_cb.addItems(customer_names)
+    form_layout.addRow(label(form_card, "Customer Name", kind="bold"), customer_cb)
 
     # Product selection
-    label(form_card, "Product", kind="bold").grid(row=1, column=0, sticky="w", pady=5, padx=5)
-    product_var = tk.StringVar()
     products = svc.inventory.get_all_products(active_only=True)
     product_names = [p.get("model", "") for p in products if p.get("model")]
-    product_cb = combobox(form_card, values=product_names, textvariable=product_var, state="readonly")
-    product_cb.grid(row=1, column=1, sticky="ew", pady=5, padx=5)
+    product_cb = QtWidgets.QComboBox()
+    product_cb.addItems(product_names)
+    form_layout.addRow(label(form_card, "Product", kind="bold"), product_cb)
 
     # Quantity
-    label(form_card, "Quantity", kind="bold").grid(row=2, column=0, sticky="w", pady=5, padx=5)
-    qty_var = tk.StringVar(value="1")
-    qty_entry = entry(form_card, textvariable=qty_var)
-    qty_entry.grid(row=2, column=1, sticky="ew", pady=5, padx=5)
+    qty_edit = QtWidgets.QLineEdit("1")
+    form_layout.addRow(label(form_card, "Quantity", kind="bold"), qty_edit)
 
     # Due date
-    label(form_card, "Due Date (YYYY-MM-DD)", kind="bold").grid(row=3, column=0, sticky="w", pady=5, padx=5)
-    due_var = tk.StringVar(value=(datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d"))
-    due_entry = entry(form_card, textvariable=due_var)
-    due_entry.grid(row=3, column=1, sticky="ew", pady=5, padx=5)
+    due_edit = QtWidgets.QLineEdit((datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d"))
+    form_layout.addRow(label(form_card, "Due Date (YYYY-MM-DD)", kind="bold"), due_edit)
 
     # Notes
-    label(form_card, "Notes", kind="bold").grid(row=4, column=0, sticky="w", pady=5, padx=5)
-    notes_var = tk.StringVar()
-    notes_entry = entry(form_card, textvariable=notes_var)
-    notes_entry.grid(row=4, column=1, sticky="ew", pady=5, padx=5)
+    notes_edit = QtWidgets.QLineEdit()
+    form_layout.addRow(label(form_card, "Notes", kind="bold"), notes_edit)
 
-    btn_frame = ttk.Frame(dlg)
-    btn_frame.pack(fill="x", pady=10, padx=10)
+    btn_frame = QtWidgets.QWidget()
+    btn_layout = QtWidgets.QHBoxLayout(btn_frame)
+    btn_layout.addStretch()
+    layout.addWidget(btn_frame)
 
     def create():
-        customer_name = customer_var.get()
-        product_name = product_var.get()
+        customer_name = customer_cb.currentText()
+        product_name = product_cb.currentText()
         if not customer_name or not product_name:
-            messagebox.showerror("Error", "Customer and Product are required")
+            QtWidgets.QMessageBox.critical(dlg, "Error", "Customer and Product are required")
             return
 
         try:
-            qty = int(qty_var.get())
+            qty = int(qty_edit.text())
         except ValueError:
-            messagebox.showerror("Error", "Invalid quantity")
+            QtWidgets.QMessageBox.critical(dlg, "Error", "Invalid quantity")
             return
 
         product = next((p for p in products if p.get("model") == product_name), None)
         if not product:
-            messagebox.showerror("Error", "Product not found")
+            QtWidgets.QMessageBox.critical(dlg, "Error", "Product not found")
             return
 
         unit_price = product.get("selling_price", 0)
         subtotal = qty * unit_price
-        tax_rate = 0  # Can be configurable
+        tax_rate = 0
         tax_amount = subtotal * tax_rate / 100
         total = subtotal + tax_amount
 
@@ -244,14 +256,14 @@ def _open_create_invoice_dialog(master, current_user=None):
             "invoice_number": invoice_number,
             "customer_name": customer_name,
             "invoice_date": datetime.now().isoformat(),
-            "due_date": due_var.get(),
+            "due_date": due_edit.text(),
             "subtotal": subtotal,
             "tax_rate": tax_rate,
             "tax_amount": tax_amount,
             "total_amount": total,
             "amount_paid": 0,
             "status": "pending",
-            "notes": notes_var.get(),
+            "notes": notes_edit.text(),
             "created_by": username,
         }
 
@@ -265,26 +277,31 @@ def _open_create_invoice_dialog(master, current_user=None):
 
         try:
             svc.invoice.create_invoice(invoice_data, items, username=username)
-            messagebox.showinfo("Success", f"Invoice {invoice_number} created")
-            dlg.destroy()
+            QtWidgets.QMessageBox.information(dlg, "Success", f"Invoice {invoice_number} created")
+            dlg.accept()
         except Exception as e:
             logger.error(f"Failed to create invoice: {e}", exc_info=True)
-            messagebox.showerror("Error", str(e))
+            QtWidgets.QMessageBox.critical(dlg, "Error", str(e))
 
-    make_button(btn_frame, "Create Invoice", command=create, kind="primary").pack(side="right", padx=5)
-    make_button(btn_frame, "Cancel", command=dlg.destroy, kind="secondary").pack(side="right", padx=5)
+    create_btn = make_button(btn_frame, "Create Invoice", command=create, kind="primary")
+    btn_layout.addWidget(create_btn)
+    cancel_btn = make_button(btn_frame, "Cancel", command=dlg.reject, kind="secondary")
+    btn_layout.addWidget(cancel_btn)
 
 
 def _open_invoice_detail(master, invoice, current_user=None, on_refresh=None):
     """Dialog to view invoice details and record payments."""
-    dlg = tk.Toplevel(master)
-    dlg.title(f"Invoice {invoice.get('invoice_number', '')}")
-    dlg.geometry("500x400")
-    dlg.transient(master)
-    dlg.grab_set()
+    dlg = QtWidgets.QDialog(master)
+    dlg.setWindowTitle(f"Invoice {invoice.get('invoice_number', '')}")
+    dlg.resize(500, 400)
+    dlg.setModal(True)
+
+    layout = QtWidgets.QVBoxLayout(dlg)
+    layout.setContentsMargins(10, 10, 10, 10)
 
     form_card = make_card(dlg, padx=20, pady=20)
-    form_card.pack(fill="both", expand=True, padx=10, pady=10)
+    form_layout = QtWidgets.QFormLayout(form_card)
+    layout.addWidget(form_card)
 
     details = [
         ("Invoice #", invoice.get("invoice_number", "")),
@@ -296,24 +313,23 @@ def _open_invoice_detail(master, invoice, current_user=None, on_refresh=None):
         ("Status", invoice.get("status", "")),
     ]
 
-    for i, (lbl, val) in enumerate(details):
-        label(form_card, lbl, kind="bold").grid(row=i, column=0, sticky="w", pady=3, padx=5)
-        label(form_card, val).grid(row=i, column=1, sticky="w", pady=3, padx=5)
+    for lbl, val in details:
+        form_layout.addRow(label(form_card, lbl, kind="bold"), label(form_card, val))
 
     # Payment section
-    pay_frame = ttk.Frame(dlg)
-    pay_frame.pack(fill="x", pady=10, padx=10)
+    pay_frame = QtWidgets.QWidget()
+    pay_layout = QtWidgets.QVBoxLayout(pay_frame)
+    layout.addWidget(pay_frame)
 
-    label(pay_frame, "Payment Amount", kind="bold").pack(anchor="w")
-    pay_var = tk.StringVar()
-    pay_entry = entry(pay_frame, textvariable=pay_var)
-    pay_entry.pack(fill="x", pady=3)
+    pay_layout.addWidget(label(pay_frame, "Payment Amount", kind="bold"))
+    pay_edit = QtWidgets.QLineEdit()
+    pay_layout.addWidget(pay_edit)
 
     def record_payment():
         try:
-            amount = float(pay_var.get())
+            amount = float(pay_edit.text())
         except ValueError:
-            messagebox.showerror("Error", "Invalid payment amount")
+            QtWidgets.QMessageBox.critical(dlg, "Error", "Invalid payment amount")
             return
 
         username = current_user or getattr(app_state, "username", "system")
@@ -321,12 +337,14 @@ def _open_invoice_detail(master, invoice, current_user=None, on_refresh=None):
             from database import db
             db.audit_event(username, "invoice_payment", "invoices", invoice.get("invoice_id"),
                            f"Payment of {amount} for {invoice.get('invoice_number')}")
-            messagebox.showinfo("Success", f"Payment of {amount} recorded")
-            dlg.destroy()
+            QtWidgets.QMessageBox.information(dlg, "Success", f"Payment of {amount} recorded")
+            dlg.accept()
             if on_refresh:
                 on_refresh()
         except Exception as e:
-            messagebox.showerror("Error", str(e))
+            QtWidgets.QMessageBox.critical(dlg, "Error", str(e))
 
-    make_button(pay_frame, "Record Payment", command=record_payment, kind="success").pack(pady=5)
-    make_button(pay_frame, "Close", command=dlg.destroy, kind="secondary").pack(pady=5)
+    pay_btn = make_button(pay_frame, "Record Payment", command=record_payment, kind="success")
+    pay_layout.addWidget(pay_btn)
+    close_btn = make_button(pay_frame, "Close", command=dlg.reject, kind="secondary")
+    pay_layout.addWidget(close_btn)

@@ -10,8 +10,9 @@ Usage:
     card_frame = create_business_card(parent, dashboard_frame)
 """
 
-import tkinter as tk
-from tkinter import ttk, messagebox
+from PySide6.QtWidgets import (QFrame, QLabel, QPushButton, QDialog, QVBoxLayout, QHBoxLayout,
+                               QMessageBox)
+from PySide6.QtCore import Qt
 from typing import Callable, Optional
 import logging
 
@@ -75,175 +76,207 @@ def open_industry_change_dialog(parent, on_confirm: Callable = None):
         parent,
         on_industry_changed=on_industry_selected
     )
-    selector_frame.pack(fill="both", expand=True, padx=10, pady=10)
+    layout = QVBoxLayout(parent)
+    layout.addWidget(selector_frame)
 
 
 def create_business_card(parent, dashboard_frame, switch_tab_callback: Optional[Callable] = None):
     """
     Create business settings card for dashboard
-    
+
     Args:
         parent: Parent widget
         dashboard_frame: Dashboard frame for context
         switch_tab_callback: Optional callback for tab switching
-        
+
     Returns:
         Created card frame
     """
     # Create card container
     card_container = make_glass_card(parent, padx=25, pady=20)
-    
+    layout = QVBoxLayout(card_container)
+
     # Header
-    header_frame = ttk.Frame(card_container)
-    header_frame.pack(fill="x", pady=(0, 15))
-    
+    header_frame = QFrame()
+    header_layout = QVBoxLayout(header_frame)
+    header_layout.setContentsMargins(0, 0, 0, 0)
+
     # Title with icon
     title_label = styled_label(
-        header_frame,
+        header_layout,
         "🏢 Business Configuration",
         font=SUBHEADING_FONT,
         foreground=get_color('text_main')
     )
-    title_label.pack(anchor="w")
-    
+
     # Create divider
-    create_divider(header_frame, orientation="horizontal").pack(fill="x", pady=(8, 15))
-    
+    create_divider(header_layout, orientation="horizontal")
+
+    layout.addWidget(header_frame)
+
     # Current industry display
-    industry_frame = ttk.Frame(card_container)
-    industry_frame.pack(fill="x", pady=(0, 15))
-    
+    industry_frame = QFrame()
+    industry_layout = QVBoxLayout(industry_frame)
+    industry_layout.setContentsMargins(0, 0, 0, 0)
+
     # Get current industry
     current_industry = get_current_industry()
     industry_config = get_config(current_industry)
-    
+
     # Industry icon and name
-    industry_display = ttk.Frame(industry_frame)
-    industry_display.pack(anchor="w")
-    
+    industry_display = QFrame()
+    industry_display_layout = QHBoxLayout(industry_display)
+    industry_display_layout.setContentsMargins(0, 0, 0, 0)
+
     industry_icon = styled_label(
-        industry_display,
+        industry_display_layout,
         industry_config.get("icon", "🏪"),
         font=("Segoe UI", 32)
     )
-    industry_icon.pack(side="left", padx=(0, 12))
-    
-    industry_info = ttk.Frame(industry_display)
-    industry_info.pack(side="left", fill="x", expand=True)
-    
+
+    industry_info = QFrame()
+    info_layout = QVBoxLayout(industry_info)
+    info_layout.setContentsMargins(0, 0, 0, 0)
+
     industry_name = styled_label(
-        industry_info,
+        info_layout,
         current_industry,
         font=FONT_HEADING,
         foreground=get_color('primary')
     )
-    industry_name.pack(anchor="w")
-    
+
     industry_desc = styled_label(
-        industry_info,
+        info_layout,
         industry_config.get("description", "Business configuration"),
         font=FONT_SMALL,
         foreground=get_color('text_muted'),
-        wraplength=400
     )
-    industry_desc.pack(anchor="w", pady=(4, 0))
-    
+    industry_desc.setWordWrap(True)
+    industry_desc.setMaximumWidth(400)
+
+    industry_display_layout.addWidget(industry_info)
+    industry_layout.addWidget(industry_display)
+    layout.addWidget(industry_frame)
+
     # Enabled verticals
-    verticals_frame = ttk.Frame(card_container)
-    verticals_frame.pack(fill="x", pady=(15, 20))
-    
+    verticals_frame = QFrame()
+    verticals_layout = QVBoxLayout(verticals_frame)
+    verticals_layout.setContentsMargins(0, 0, 0, 0)
+
     enabled_verticals = get_enabled_verticals()
-    
+
     verticals_title = styled_label(
-        verticals_frame,
+        verticals_layout,
         f"✅ {len(enabled_verticals)} Features Enabled",
         font=FONT_SMALL,
         foreground=get_color('success')
     )
-    verticals_title.pack(anchor="w", pady=(0, 10))
-    
+
     # Show vertical badges
-    badges_frame = ttk.Frame(verticals_frame)
-    badges_frame.pack(anchor="w", fill="x")
-    
+    badges_frame = QFrame()
+    badges_layout = QHBoxLayout(badges_frame)
+    badges_layout.setContentsMargins(0, 0, 0, 0)
+
     for i, vertical_name in enumerate(enabled_verticals[:4]):  # Show max 4
         # Get vertical display name
         vertical_display = vertical_name.replace("_", " ").title()
         if vertical_name == "lease_rental":
             vertical_display = "Lease & Rental"
-        
+
         # Create badge
         badge = styled_label(
-            badges_frame,
+            badges_layout,
             f"✓ {vertical_display}",
             font=FONT_SMALL,
             foreground=get_color('text_muted'),
             background=get_color('card_bg')
         )
-        badge.pack(side="left", padx=(0, 10) if i < len(enabled_verticals) - 1 and i < 3 else (0, 0))
-    
+
     if len(enabled_verticals) > 4:
         more_label = styled_label(
-            badges_frame,
+            badges_layout,
             f"+{len(enabled_verticals) - 4} more",
             font=FONT_SMALL,
             foreground=get_color('text_muted')
         )
-        more_label.pack(side="left", padx=(10, 0))
-    
+
+    verticals_layout.addWidget(badges_frame)
+    layout.addWidget(verticals_frame)
+
     # Action buttons
-    buttons_frame = ttk.Frame(card_container)
-    buttons_frame.pack(fill="x", pady=(10, 0))
-    
+    buttons_frame = QFrame()
+    buttons_layout = QHBoxLayout(buttons_frame)
+    buttons_layout.setContentsMargins(0, 0, 0, 0)
+
     # Change industry button (primary)
     def on_change_industry():
-        open_industry_change_dialog(
-            parent,
-            on_confirm=lambda industry_id: refresh_card()
-        )
-    
+        dialog = QDialog(parent)
+        dialog.setWindowTitle("Change Business Type")
+        dialog.resize(800, 600)
+        dialog.setModal(True)
+
+        dialog_layout = QVBoxLayout(dialog)
+
+        def on_confirm(industry_id):
+            dialog.accept()
+            refresh_card()
+
+        open_industry_change_dialog(dialog, on_confirm=on_confirm)
+        dialog.exec()
+
     change_btn = make_button(
-        buttons_frame,
+        buttons_layout,
         "🔄 Change Business Type",
         on_change_industry,
         kind="primary"
     )
-    change_btn.pack(side="left", padx=(0, 10))
-    
+
     # Configure features button (secondary)
     def on_configure():
         # Navigate to settings or show configuration dialog
         if switch_tab_callback:
             switch_tab_callback("Settings")
         else:
-            messagebox.showinfo(
+            QMessageBox.information(
+                parent,
                 "Configure Features",
                 "Feature configuration will be available in the Settings tab.\n\n"
                 "You can enable/disable specific features for each vertical module.",
-                parent=parent
             )
-    
+
     configure_btn = make_button(
-        buttons_frame,
+        buttons_layout,
         "⚙️ Configure",
         on_configure,
         kind="secondary"
     )
-    configure_btn.pack(side="left")
-    
+
+    layout.addWidget(buttons_frame)
+
     # Helper function to refresh card content
     def refresh_card():
         """Refresh card content after industry change"""
-        for widget in card_container.winfo_children():
-            widget.destroy()
-        
+        # Clear layout
+        while layout.count():
+            item = layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
         # Recreate card content
-        new_card = create_business_card(parent, dashboard_frame, switch_tab_callback)
-        new_card.pack(fill="x", pady=(10, 0))
-    
+        current_industry = get_current_industry()
+        industry_config = get_config(current_industry)
+        enabled_verticals = get_enabled_verticals()
+
+        # Update industry display
+        industry_name.setText(current_industry)
+        industry_desc.setText(industry_config.get("description", "Business configuration"))
+        industry_icon.setText(industry_config.get("icon", "🏪"))
+
+        verticals_title.setText(f"✅ {len(enabled_verticals)} Features Enabled")
+
     # Store refresh function for keyboard shortcut
     card_container.refresh = refresh_card
-    
+
     return card_container
 
 
@@ -255,7 +288,9 @@ def bind_industry_shortcut(root, dashboard_frame=None):
         root: Root window
         dashboard_frame: Optional dashboard frame
     """
-    def on_shortcut(event=None):
+    from PySide6.QtGui import QKeySequence, QShortcut
+
+    def on_shortcut():
         """Handle Ctrl+I shortcut"""
         def on_confirm(industry_id):
             # Callback expects single industry_id parameter
@@ -263,17 +298,23 @@ def bind_industry_shortcut(root, dashboard_frame=None):
             if dashboard_frame and hasattr(dashboard_frame, 'refresh'):
                 dashboard_frame.refresh()
 
-        open_industry_change_dialog(root, on_confirm=on_confirm)
-    
+        dialog = QDialog(root)
+        dialog.setWindowTitle("Change Industry")
+        dialog.resize(800, 600)
+        dialog.setModal(True)
+        dialog_layout = QVBoxLayout(dialog)
+        open_industry_change_dialog(dialog, on_confirm=on_confirm)
+        dialog.exec()
+
     # Bind Ctrl+I
-    root.bind("<Control-i>", on_shortcut)
-    root.bind("<Control-I>", on_shortcut)
+    shortcut = QShortcut(QKeySequence("Ctrl+I"), root)
+    shortcut.activated.connect(on_shortcut)
 
 
 def open_business_configuration(parent, current_user=None):
     """
     Open full business configuration window
-    
+
     Args:
         parent: Parent window
         current_user: Current username (for admin check)
@@ -283,162 +324,164 @@ def open_business_configuration(parent, current_user=None):
         from .utils import load_users
     except (ImportError, ModuleNotFoundError):
         from utils import load_users
-    
+
     users = load_users()
     if current_user and users.get(current_user, {}).get("role") not in ["admin", "OWNER_ADMIN"]:
-        messagebox.showerror("Permission Denied", "Only administrators can change business configuration.")
+        QMessageBox.critical(parent, "Permission Denied", "Only administrators can change business configuration.")
         return
-    
+
     # Create configuration window
-    win = tk.Toplevel(parent) if parent else tk.Toplevel()
-    win.title("⚙️ Business Configuration")
-    win.geometry("700x600")
-    win.minsize(600, 500)
-    win.resizable(True, True)
-    
-    # Modal
-    win.transient(parent)
-    win.grab_set()
-    
-    # Center on parent
-    if parent:
-        win.update_idletasks()
-        x = parent.winfo_x() + (parent.winfo_width() - 700) // 2
-        y = parent.winfo_y() + (parent.winfo_height() - 600) // 2
-        win.geometry(f"+{x}+{y}")
-    
+    win = QDialog(parent) if parent else QDialog()
+    win.setWindowTitle("⚙️ Business Configuration")
+    win.resize(700, 600)
+    win.setMinimumSize(600, 500)
+    win.setModal(True)
+
     # Theme-aware background
-    win.configure(bg=get_color('app_bg'))
-    
+    win.setStyleSheet(f"background-color: {get_color('app_bg')};")
+
     # Main container
     main_frame = make_glass_card(win, padx=30, pady=30)
-    main_frame.pack(fill="both", expand=True, padx=20, pady=20)
-    
+    main_layout = QVBoxLayout(main_frame)
+
     # Header
-    header_frame = ttk.Frame(main_frame)
-    header_frame.pack(fill="x", pady=(0, 20))
-    
+    header_frame = QFrame()
+    header_layout = QVBoxLayout(header_frame)
+    header_layout.setContentsMargins(0, 0, 0, 0)
+
     title_label = styled_label(
-        header_frame,
+        header_layout,
         "🏢 Business Configuration",
         font=FONT_HEADING,
         foreground=get_color('text_main')
     )
-    title_label.pack(anchor="w")
-    
+
     subtitle_label = styled_label(
-        header_frame,
+        header_layout,
         "Configure your business type and enabled features",
         font=FONT_SMALL,
         foreground=get_color('text_muted')
     )
-    subtitle_label.pack(anchor="w", pady=(8, 0))
-    
-    create_divider(header_frame, orientation="horizontal").pack(fill="x", pady=(15, 25))
-    
+
+    create_divider(header_layout, orientation="horizontal")
+
+    main_layout.addWidget(header_frame)
+
     # Current configuration section
-    config_frame = ttk.Frame(main_frame)
-    config_frame.pack(fill="x", pady=(0, 25))
-    
+    config_frame = QFrame()
+    config_layout = QVBoxLayout(config_frame)
+    config_layout.setContentsMargins(0, 0, 0, 0)
+
     current_industry = get_current_industry()
     industry_config = get_config(current_industry)
-    
+
     config_title = styled_label(
-        config_frame,
+        config_layout,
         "Current Configuration",
         font=SUBHEADING_FONT,
         foreground=get_color('text_main')
     )
-    config_title.pack(anchor="w", pady=(0, 15))
-    
+
     # Industry display
-    industry_display = ttk.Frame(config_frame)
-    industry_display.pack(fill="x", pady=(0, 15))
-    
+    industry_display = QFrame()
+    industry_display_layout = QHBoxLayout(industry_display)
+    industry_display_layout.setContentsMargins(0, 0, 0, 0)
+
     industry_icon_label = styled_label(
-        industry_display,
+        industry_display_layout,
         industry_config.get("icon", "🏪"),
         font=("Segoe UI", 48)
     )
-    industry_icon_label.pack(side="left", padx=(0, 16))
-    
-    industry_info = ttk.Frame(industry_display)
-    industry_info.pack(side="left", fill="x", expand=True)
-    
+
+    industry_info = QFrame()
+    info_layout = QVBoxLayout(industry_info)
+    info_layout.setContentsMargins(0, 0, 0, 0)
+
     industry_name_label = styled_label(
-        industry_info,
+        info_layout,
         current_industry,
         font=FONT_HEADING,
         foreground=get_color('primary')
     )
-    industry_name_label.pack(anchor="w")
-    
+
     industry_desc_label = styled_label(
-        industry_info,
+        info_layout,
         industry_config.get("description", ""),
         font=FONT_SMALL,
         foreground=get_color('text_muted'),
-        wraplength=500
     )
-    industry_desc_label.pack(anchor="w", pady=(6, 0))
-    
+    industry_desc_label.setWordWrap(True)
+    industry_desc_label.setMaximumWidth(500)
+
+    industry_display_layout.addWidget(industry_info)
+    config_layout.addWidget(industry_display)
+
     # Enabled verticals
     enabled_verticals = get_enabled_verticals()
-    
+
     verticals_title = styled_label(
-        config_frame,
+        config_layout,
         f"✅ Enabled Modules ({len(enabled_verticals)})",
         font=SUBHEADING_FONT,
         foreground=get_color('text_main')
     )
-    verticals_title.pack(anchor="w", pady=(20, 12))
-    
+
     # List verticals
     for vertical in enabled_verticals:
         vertical_display = vertical.replace("_", " ").title()
         if vertical == "lease_rental":
             vertical_display = "Lease & Rental"
-        
+
         vertical_item = styled_label(
-            config_frame,
+            config_layout,
             f"✓ {vertical_display}",
             font=FONT_SMALL,
             foreground=get_color('success')
         )
-        vertical_item.pack(anchor="w", pady=2)
-    
+
+    main_layout.addWidget(config_frame)
+
     # Action buttons
-    buttons_frame = ttk.Frame(main_frame)
-    buttons_frame.pack(fill="x", pady=(30, 0))
-    
+    buttons_frame = QFrame()
+    buttons_layout = QHBoxLayout(buttons_frame)
+    buttons_layout.setContentsMargins(0, 0, 0, 0)
+
     def on_change_industry():
         def on_confirm(industry_id):
             # Refresh display
-            for widget in main_frame.winfo_children():
-                widget.destroy()
+            while main_layout.count():
+                item = main_layout.takeAt(0)
+                if item.widget():
+                    item.widget().deleteLater()
             # Recreate content
             open_business_configuration(parent, current_user)
 
-        open_industry_change_dialog(win, on_confirm=on_confirm)
-    
+        dialog = QDialog(win)
+        dialog.setWindowTitle("Change Business Type")
+        dialog.resize(800, 600)
+        dialog.setModal(True)
+        dialog_layout = QVBoxLayout(dialog)
+        open_industry_change_dialog(dialog, on_confirm=on_confirm)
+        dialog.exec()
+
     change_btn = make_button(
-        buttons_frame,
+        buttons_layout,
         "🔄 Change Business Type",
         on_change_industry,
         kind="primary"
     )
-    change_btn.pack(side="left", padx=(0, 10))
-    
+
     close_btn = make_button(
-        buttons_frame,
+        buttons_layout,
         "Close",
-        lambda: win.destroy(),
+        lambda: win.reject(),
         kind="secondary"
     )
-    close_btn.pack(side="left")
-    
-    # Show window
-    win.wait_window()
+
+    main_layout.addWidget(buttons_frame)
+
+    win.setLayout(main_layout)
+    win.exec()
 
 
 __all__ = [

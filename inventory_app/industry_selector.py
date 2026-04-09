@@ -1,12 +1,14 @@
 """
 Industry Selector Component
 ============================
-Modern industry selection for dashboard using standard ttk.
+Modern industry selection for dashboard using PySide6.
 All industry config/state comes from industry_service.py — single source of truth.
 """
 
-import tkinter as tk
-from tkinter import ttk, messagebox
+from PySide6.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont
+from PySide6.QtWidgets import QMessageBox
 from ui_theme import (
     make_card, make_button, styled_label, get_color,
     FONT_HEADING, FONT_BOLD, FONT_SMALL, COLOR_PRIMARY, COLOR_BORDER
@@ -19,43 +21,52 @@ def create_industry_selector_card(parent, on_industry_changed=None):
     Renamed to match dashboard_ui expectations.
     """
     container = make_card(parent, padx=30, pady=30)
+    layout = QVBoxLayout(container)
 
     # Title & Subtitle
-    header_frame = ttk.Frame(container)
-    header_frame.pack(fill="x", pady=(0, 20))
+    header_frame = QFrame()
+    header_layout = QVBoxLayout(header_frame)
+    header_layout.setContentsMargins(0, 0, 0, 0)
 
-    styled_label(header_frame, "🎯 Industry vertical", font=FONT_HEADING).pack(anchor="w")
-    styled_label(header_frame, "Select your primary business type to enable specialized features",
-                font=FONT_SMALL, foreground=get_color('text_muted')).pack(anchor="w")
+    styled_label(header_layout, "🎯 Industry vertical", font=FONT_HEADING)
+    styled_label(header_layout, "Select your primary business type to enable specialized features",
+                font=FONT_SMALL, foreground=get_color('text_muted'))
+
+    layout.addWidget(header_frame)
 
     # Grid for industry options
-    grid_frame = ttk.Frame(container)
-    grid_frame.pack(fill="x")
+    grid_frame = QFrame()
+    grid_layout = QGridLayout(grid_frame)
+    for i in range(3):
+        grid_layout.setColumnStretch(i, 1)
 
     current_industry = get_current_industry_id()
     all_configs = get_all_configs()
 
-    # Create 3 columns
-    for i in range(3):
-        grid_frame.columnconfigure(i, weight=1)
-
     row, col = 0, 0
     for industry_id, config in all_configs.items():
         # Individual industry card
-        opt_card = tk.Frame(grid_frame, bg=get_color('app_bg'),
-                           highlightbackground=COLOR_PRIMARY if current_industry == industry_id else COLOR_BORDER,
-                           highlightthickness=2 if current_industry == industry_id else 1,
-                           padx=15, pady=15)
-        opt_card.grid(row=row, column=col, padx=10, pady=10, sticky="nsew")
+        opt_card = QFrame()
+        opt_card.setFrameShape(QFrame.StyledPanel)
+        opt_card.setStyleSheet(f"""
+            QFrame {{
+                background-color: {get_color('app_bg')};
+                border: 2px solid {COLOR_PRIMARY if current_industry == industry_id else COLOR_BORDER};
+                border-radius: 8px;
+                padding: 15px;
+            }}
+        """)
+        card_layout = QVBoxLayout(opt_card)
 
         # Icon & Name
-        styled_label(opt_card, f"{config['icon']} {config['name']}", font=FONT_BOLD,
-                    background=get_color('app_bg')).pack(anchor="w")
+        styled_label(card_layout, f"{config['icon']} {config['name']}", font=FONT_BOLD,
+                    background=get_color('app_bg'))
 
         # Description
-        styled_label(opt_card, config['description'], font=FONT_SMALL,
-                    foreground=get_color('text_muted'), background=get_color('app_bg'),
-                    wraplength=200).pack(anchor="w", pady=(5, 10))
+        desc_label = styled_label(card_layout, config['description'], font=FONT_SMALL,
+                    foreground=get_color('text_muted'), background=get_color('app_bg'))
+        desc_label.setWordWrap(True)
+        desc_label.setMaximumWidth(200)
 
         # Select Button
         btn_text = "✓ Current" if current_industry == industry_id else "Select"
@@ -66,15 +77,18 @@ def create_industry_selector_card(parent, on_industry_changed=None):
                 if on_industry_changed:
                     on_industry_changed(iid)
             else:
-                messagebox.showerror("Error", "Failed to update industry setting.")
+                QMessageBox.critical(container, "Error", "Failed to update industry setting.")
 
-        btn = make_button(opt_card, btn_text, command=make_select_cmd, kind=btn_kind)
-        btn.pack(fill="x", pady=(5))
+        make_button(card_layout, btn_text, command=make_select_cmd, kind=btn_kind)
+
+        grid_layout.addWidget(opt_card, row, col)
 
         col += 1
         if col > 2:
             col = 0
             row += 1
+
+    layout.addWidget(grid_frame)
 
     return container
 

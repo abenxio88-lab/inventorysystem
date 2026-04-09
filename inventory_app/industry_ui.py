@@ -5,8 +5,7 @@ Adapt UI and features based on business type.
 All industry config/state comes from industry_service.py — single source of truth.
 """
 
-import tkinter as tk
-from tkinter import ttk, messagebox
+from PySide6 import QtWidgets, QtCore, QtGui
 import logging
 
 from ui_theme import make_card, styled_label, make_button, FONT_REGULAR, FONT_BOLD, COLOR_PRIMARY
@@ -21,33 +20,46 @@ def create_industry_selector(parent, on_select_callback=None):
     Create industry selection dialog.
     Shows on first run or when user wants to change industry.
     """
-    dlg = tk.Toplevel(parent)
-    dlg.title("Select Your Business Type")
-    dlg.geometry("1100x800")
-    dlg.resizable(True, True)
-    dlg.transient(parent)
-    dlg.grab_set()
+    dlg = QtWidgets.QDialog(parent)
+    dlg.setWindowTitle("Select Your Business Type")
+    dlg.resize(1100, 800)
+    dlg.setModal(True)
 
     # Content
-    content = ttk.Frame(dlg, padding=30)
-    content.pack(fill=tk.BOTH, expand=True)
+    content = QtWidgets.QWidget()
+    content_layout = QtWidgets.QVBoxLayout(content)
+    content_layout.setContentsMargins(30, 30, 30, 30)
 
     # Header
-    header_frame = ttk.Frame(content)
-    header_frame.pack(fill=tk.X, pady=(0, 20))
+    header_frame = QtWidgets.QWidget()
+    header_layout = QtWidgets.QVBoxLayout(header_frame)
+    header_layout.setContentsMargins(0, 0, 0, 20)
 
-    styled_label(header_frame, "🎯 Select Your Industry", font=FONT_BOLD).pack(anchor=tk.W)
-    styled_label(header_frame, "Choose the option that best describes your business",
-                 foreground="#6c757d").pack(anchor=tk.W, pady=(5, 0))
+    title_label = styled_label(header_frame, "\U0001f3af Select Your Industry", font=FONT_BOLD)
+    title_label.setAlignment(QtCore.Qt.AlignLeft)
+    header_layout.addWidget(title_label)
+
+    subtitle_label = styled_label(header_frame, "Choose the option that best describes your business",
+                 foreground="#6c757d")
+    subtitle_label.setAlignment(QtCore.Qt.AlignLeft)
+    header_layout.addWidget(subtitle_label)
+
+    content_layout.addWidget(header_frame)
 
     # Industry cards
-    cards_frame = ttk.Frame(content)
-    cards_frame.pack(fill=tk.BOTH, expand=True)
+    cards_scroll = QtWidgets.QScrollArea()
+    cards_scroll.setWidgetResizable(True)
+    cards_scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+
+    cards_frame = QtWidgets.QWidget()
+    cards_layout = QtWidgets.QGridLayout(cards_frame)
+    cards_layout.setContentsMargins(0, 0, 0, 0)
 
     selected_industry = {'value': None}
 
     def select_industry(industry_id):
         selected_industry['value'] = industry_id
+        dlg.accept()
 
     # Create cards in grid
     industries = list(INDUSTRY_CONFIGS.items())
@@ -57,26 +69,31 @@ def create_industry_selector(parent, on_select_callback=None):
     for industry_id, config in industries:
         # Create card
         card = make_card(cards_frame, padding=20)
-        card.grid(row=row, column=col, padx=10, pady=10, sticky="nsew")
-
-        # Configure grid
-        if col == 0:
-            cards_frame.grid_columnconfigure(0, weight=1)
-        if col == 1:
-            cards_frame.grid_columnconfigure(1, weight=1)
+        card_layout = QtWidgets.QVBoxLayout(card)
 
         # Icon and name
-        name_frame = ttk.Frame(card)
-        name_frame.pack(fill=tk.X, pady=(0, 10))
+        name_frame = QtWidgets.QWidget()
+        name_layout = QtWidgets.QHBoxLayout(name_frame)
+        name_layout.setContentsMargins(0, 0, 0, 10)
 
-        styled_label(name_frame, text=config['icon'], font=("Segoe UI", 32)).pack(side=tk.LEFT, padx=(0, 10))
+        icon_label = styled_label(name_frame, text=config['icon'], font=("Segoe UI", 32))
+        name_layout.addWidget(icon_label)
 
-        info_frame = ttk.Frame(name_frame)
-        info_frame.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        info_frame = QtWidgets.QWidget()
+        info_layout = QtWidgets.QVBoxLayout(info_frame)
+        info_layout.setContentsMargins(0, 0, 0, 0)
 
-        styled_label(info_frame, text=config['name'], font=FONT_BOLD).pack(anchor=tk.W)
-        styled_label(info_frame, text=config['description'],
-                    foreground="#6c757d", font=("Segoe UI", 9)).pack(anchor=tk.W)
+        name_label = styled_label(info_frame, text=config['name'], font=FONT_BOLD)
+        name_label.setAlignment(QtCore.Qt.AlignLeft)
+        info_layout.addWidget(name_label)
+
+        desc_label = styled_label(info_frame, text=config['description'],
+                    foreground="#6c757d", font=("Segoe UI", 9))
+        desc_label.setAlignment(QtCore.Qt.AlignLeft)
+        info_layout.addWidget(desc_label)
+
+        name_layout.addWidget(info_frame, stretch=1)
+        card_layout.addWidget(name_frame)
 
         # Features preview
         features = config['features']
@@ -84,29 +101,46 @@ def create_industry_selector(parent, on_select_callback=None):
                            for k, v in features.items() if v]
 
         if enabled_features:
-            features_text = " • ".join(enabled_features[:3])
-            styled_label(card, text=features_text, font=("Segoe UI", 8),
-                        foreground=COLOR_PRIMARY).pack(anchor=tk.W, pady=(5, 10))
+            features_text = " \u2022 ".join(enabled_features[:3])
+            feat_label = styled_label(card, text=features_text, font=("Segoe UI", 8),
+                        foreground=COLOR_PRIMARY)
+            feat_label.setAlignment(QtCore.Qt.AlignLeft)
+            card_layout.addWidget(feat_label)
+            card_layout.addSpacing(10)
 
         # Select button
-        make_button(card, "Select", command=lambda iid=industry_id: (select_industry(iid), dlg.destroy()),
-                   kind="primary").pack(anchor=tk.E)
+        select_btn = make_button(card, "Select", command=lambda iid=industry_id: select_industry(iid),
+                   kind="primary")
+        card_layout.addWidget(select_btn, alignment=QtCore.Qt.AlignRight)
 
         # Grid positioning
+        cards_layout.addWidget(card, row, col)
+
         col += 1
         if col > 1:
             col = 0
             row += 1
 
-    # Footer
-    footer_frame = ttk.Frame(content)
-    footer_frame.pack(fill=tk.X, pady=(20, 0))
+    cards_layout.setRowStretch(row + 1, 1)
+    cards_scroll.setWidget(cards_frame)
+    content_layout.addWidget(cards_scroll, stretch=1)
 
-    styled_label(footer_frame, "You can change this later in Settings",
-                foreground="#6c757d", font=("Segoe UI", 9)).pack(side=tk.LEFT)
+    # Footer
+    footer_frame = QtWidgets.QWidget()
+    footer_layout = QtWidgets.QHBoxLayout(footer_frame)
+    footer_layout.setContentsMargins(0, 20, 0, 0)
+
+    footer_label = styled_label(footer_frame, "You can change this later in Settings",
+                foreground="#6c757d", font=("Segoe UI", 9))
+    footer_layout.addWidget(footer_label)
+    footer_layout.addStretch()
+
+    content_layout.addWidget(footer_frame)
+
+    dlg.setLayout(content_layout)
 
     # Wait for dialog to close
-    dlg.wait_window()
+    result = dlg.exec()
 
     # Call callback if industry was selected
     if selected_industry['value'] and on_select_callback:
@@ -150,63 +184,75 @@ def create_industry_settings_tab(parent, current_user=None):
     Creates the industry settings tab.
     Allows changing industry and configuring industry-specific settings.
     """
-    window = ttk.Frame(parent, padding=15)
+    window = QtWidgets.QWidget()
+    main_layout = QtWidgets.QVBoxLayout(window)
+    main_layout.setContentsMargins(15, 15, 15, 15)
 
     # Header
-    header_frame = ttk.Frame(window)
-    header_frame.pack(fill="x", pady=(0, 15))
+    header_frame = QtWidgets.QWidget()
+    header_layout = QtWidgets.QHBoxLayout(header_frame)
+    header_layout.setContentsMargins(0, 0, 0, 15)
 
-    styled_label(header_frame, "⚙️ Industry Settings", font=FONT_BOLD).pack(side=tk.LEFT)
+    styled_label(header_frame, "\u2699\ufe0f Industry Settings", font=FONT_BOLD).setAlignment(QtCore.Qt.AlignLeft)
+    header_layout.addWidget(styled_label(header_frame, "\u2699\ufe0f Industry Settings", font=FONT_BOLD))
+    header_layout.addStretch()
+
+    main_layout.addWidget(header_frame)
 
     # Current industry
     current_industry = get_current_industry()
     config = get_industry_config(current_industry)
 
     info_frame = make_card(window, padding=20)
-    info_frame.pack(fill="x", pady=(0, 15))
+    info_layout = QtWidgets.QVBoxLayout(info_frame)
 
-    styled_label(info_frame, "Current Industry", font=FONT_BOLD).pack(anchor=tk.W)
-    styled_label(info_frame, f"{config['icon']} {config['name']}",
-                font=("Segoe UI", 18), foreground=COLOR_PRIMARY).pack(anchor=tk.W, pady=(5, 10))
-    styled_label(info_frame, config['description']).pack(anchor=tk.W)
+    styled_label(info_frame, "Current Industry", font=FONT_BOLD).setAlignment(QtCore.Qt.AlignLeft)
+    info_layout.addWidget(styled_label(info_frame, f"{config['icon']} {config['name']}",
+                font=("Segoe UI", 18), foreground=COLOR_PRIMARY))
+    info_layout.addWidget(styled_label(info_frame, config['description']))
+    info_layout.addSpacing(15)
 
     # Features enabled
-    features_frame = ttk.LabelFrame(info_frame, text="Enabled Features", padding=15)
-    features_frame.pack(fill="x", pady=(15, 0))
+    features_group = QtWidgets.QGroupBox("Enabled Features")
+    features_group_layout = QtWidgets.QVBoxLayout(features_group)
 
     features = config.get('features', {})
     enabled = [k.replace('track_', '').replace('_', ' ').title() for k, v in features.items() if v]
 
     if enabled:
-        for i, feature in enumerate(enabled):
-            styled_label(features_frame, f"✓ {feature}", foreground=COLOR_PRIMARY).pack(anchor=tk.W)
+        for feature in enabled:
+            feat_label = styled_label(features_group, f"\u2713 {feature}", foreground=COLOR_PRIMARY)
+            feat_label.setAlignment(QtCore.Qt.AlignLeft)
+            features_group_layout.addWidget(feat_label)
     else:
-        styled_label(features_frame, "No special features enabled", foreground="#6c757d").pack()
+        no_feat_label = styled_label(features_group, "No special features enabled", foreground="#6c757d")
+        no_feat_label.setAlignment(QtCore.Qt.AlignLeft)
+        features_group_layout.addWidget(no_feat_label)
+
+    info_layout.addWidget(features_group)
+
+    main_layout.addWidget(info_frame)
 
     # Change industry
-    change_frame = ttk.LabelFrame(window, text="Change Industry", padding=15)
-    change_frame.pack(fill="x", pady=(15, 0))
+    change_group = QtWidgets.QGroupBox("Change Industry")
+    change_group_layout = QtWidgets.QVBoxLayout(change_group)
 
-    styled_label(change_frame, "Select a different industry type:").pack(anchor=tk.W, pady=(0, 10))
+    styled_label(change_group, "Select a different industry type:").setAlignment(QtCore.Qt.AlignLeft)
+    change_group_layout.addWidget(styled_label(change_group, "Select a different industry type:"))
 
-    industry_var = tk.StringVar(value=current_industry)
-    industry_combo = ttk.Combobox(
-        change_frame,
-        textvariable=industry_var,
-        values=[f"{conf['icon']} {conf['name']}" for conf in INDUSTRY_CONFIGS.values()],
-        state="readonly",
-        width=40
-    )
-    industry_combo.pack(anchor=tk.W, pady=(0, 10))
+    industry_combo = QtWidgets.QComboBox()
+    industry_combo.addItems([f"{conf['icon']} {conf['name']}" for conf in INDUSTRY_CONFIGS.values()])
+    industry_combo.setEditable(False)
+    change_group_layout.addWidget(industry_combo)
 
     # Set current selection
     for i, (iid, conf) in enumerate(INDUSTRY_CONFIGS.items()):
         if iid == current_industry:
-            industry_combo.current(i)
+            industry_combo.setCurrentIndex(i)
             break
 
-    def change_industry():
-        selection = industry_combo.get()
+    def change_industry_action():
+        selection = industry_combo.currentText()
 
         # Find industry ID from selection
         selected_id = None
@@ -216,48 +262,57 @@ def create_industry_settings_tab(parent, current_user=None):
                 break
 
         if selected_id and selected_id != current_industry:
-            if messagebox.askyesno("Confirm Change",
-                                  "Changing industry will add new categories and fields.\nContinue?"):
+            reply = QtWidgets.QMessageBox.question(window, "Confirm Change",
+                                  "Changing industry will add new categories and fields.\nContinue?",
+                                  QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+            if reply == QtWidgets.QMessageBox.Yes:
                 # Use IndustryService — single source of truth
                 # Handles: validate -> persist -> AppState sync -> tab reload -> notify
                 try:
                     from industry_service import change_industry as switch_industry
                     if switch_industry(selected_id):
-                        messagebox.showinfo("Success",
+                        QtWidgets.QMessageBox.information(window, "Success",
                             f"Industry changed to {INDUSTRY_CONFIGS[selected_id]['name']}")
                     else:
-                        messagebox.showerror("Error",
+                        QtWidgets.QMessageBox.critical(window, "Error",
                             f"Failed to switch industry to '{selected_id}'. Check logs.")
                 except Exception as e:
                     logging.error(f"Industry switch error: {e}", exc_info=True)
-                    messagebox.showerror("Error", f"Failed to change industry: {e}")
+                    QtWidgets.QMessageBox.critical(window, "Error", f"Failed to change industry: {e}")
         else:
-            messagebox.showinfo("Info", "No change selected")
+            QtWidgets.QMessageBox.information(window, "Info", "No change selected")
 
-    make_button(change_frame, "Change Industry", command=change_industry, kind="primary").pack(anchor=tk.W)
+    change_btn = make_button(change_group, "Change Industry", command=change_industry_action, kind="primary")
+    change_group_layout.addWidget(change_btn)
+
+    main_layout.addWidget(change_group)
 
     # Custom fields info
-    fields_frame = ttk.LabelFrame(window, text="Custom Fields", padding=15)
-    fields_frame.pack(fill="both", expand=True, pady=(15, 0))
+    fields_group = QtWidgets.QGroupBox("Custom Fields")
+    fields_group_layout = QtWidgets.QVBoxLayout(fields_group)
 
     custom_fields = get_custom_fields(current_industry)
 
     if custom_fields:
         # Create treeview
-        columns = ("name", "type", "description")
-        tree = ttk.Treeview(fields_frame, columns=columns, show="headings", height=10)
-
-        for col in columns:
-            tree.heading(col, text=col.title())
-            tree.column(col, width=150)
-
-        tree.pack(fill=tk.BOTH, expand=True)
+        tree = QtWidgets.QTreeWidget()
+        tree.setHeaderLabels(["Name", "Type", "Description"])
+        tree.setColumnWidth(0, 150)
+        tree.setColumnWidth(1, 150)
+        tree.setColumnWidth(2, 150)
 
         for field_id, field_name, field_type in custom_fields:
-            tree.insert("", "end", values=(field_name, field_type.title(), ""))
+            item = QtWidgets.QTreeWidgetItem([field_name, field_type.title(), ""])
+            tree.addTopLevelItem(item)
+
+        fields_group_layout.addWidget(tree)
     else:
-        styled_label(fields_frame, "No custom fields for this industry",
-                    foreground="#6c757d").pack(pady=20)
+        no_fields_label = styled_label(fields_group, "No custom fields for this industry",
+                    foreground="#6c757d")
+        no_fields_label.setAlignment(QtCore.Qt.AlignCenter)
+        fields_group_layout.addWidget(no_fields_label)
+
+    main_layout.addWidget(fields_group, stretch=1)
 
     return window
 

@@ -5,12 +5,15 @@ Centralized State Management, Navigation, and Data Linking
 CLEANED UP: Removed stale cached data lists (low_stock_items, pending_orders,
 recent_sales) that were never refreshed and caused UI desynchronization.
 All data now reads directly from the database through the service layer.
+
+CONVERTED: tkinter to PySide6/Qt
 """
 import logging
-import tkinter as tk
-from tkinter import ttk
 from typing import Dict, Any, Callable, Optional
 import datetime
+
+from PySide6 import QtWidgets, QtCore, QtGui
+
 
 class AppState:
     """
@@ -53,10 +56,10 @@ class AppState:
 
         # Callbacks for UI updates (e.g. industry change notifications)
         self.ui_update_callbacks = []
-        
+
     def _build_industries_from_service(self) -> Dict[str, Dict[str, Any]]:
         """Build AppState industries dict from industry_service canonical config.
-        
+
         Uses capitalized display names (app_state_name) as keys for backward compatibility.
         """
         try:
@@ -84,25 +87,25 @@ class AppState:
         if industry in self.industries:
             self.industry_type = industry
             self.notify_ui_updates("industry_change")
-            
+
     def get_industry_config(self) -> Dict[str, Any]:
         """Get current industry configuration"""
         return self.industries.get(self.industry_type, self.industries["Retail"])
-    
+
     def navigate_to(self, module_name: str, parent_window=None):
         """Handle navigation with history tracking"""
         if self.current_module != module_name:
             self.module_history.append(self.current_module)
             self.current_module = module_name
             self.notify_ui_updates("navigation", module_name)
-            
+
     def go_back(self):
         """Navigate back to previous module"""
         if self.module_history:
             prev_module = self.module_history.pop()
             self.current_module = prev_module
             self.notify_ui_updates("navigation", prev_module)
-            
+
     def register_ui_callback(self, callback_or_event=None, callback=None):
         """Register a UI component to be notified of state changes.
 
@@ -124,7 +127,7 @@ class AppState:
             target = callback_or_event
             if target not in self.ui_update_callbacks:
                 self.ui_update_callbacks.append(target)
-            
+
     def notify_ui_updates(self, event_type: str, data: Any = None):
         """Notify all registered UI components of state changes."""
         for entry in list(self.ui_update_callbacks):
@@ -141,9 +144,9 @@ class AppState:
                 logging.error(f"UI Callback Error: {e}")
 
 
-class PremiumPopup(tk.Toplevel):
+class PremiumPopup(QtWidgets.QDialog):
     """
-    Universal Premium Popup Window
+    Universal Premium Popup Window (PySide6/Qt version)
     - Glassmorphism design
     - Responsive layout (no hidden buttons)
     - Auto-scrolling for content overflow
@@ -153,100 +156,87 @@ class PremiumPopup(tk.Toplevel):
                  resizable: bool = True, modal: bool = True, **kwargs):
         super().__init__(parent)
 
-        self.title(title)
-        self.geometry(f"{width}x{height}")
+        self.setWindowTitle(title)
+        self.resize(width, height)
 
         # Make modal if requested
         if modal:
-            self.transient(parent)
-            self.grab_set()
+            self.setModal(True)
 
         # Allow resizing but set min size
         if resizable:
-            self.minsize(700, 550)
-            self.resizable(True, True)
-        
-        # Center on parent
-        self.update_idletasks()
-        x = parent.winfo_x() + (parent.winfo_width() - width) // 2
-        y = parent.winfo_y() + (parent.winfo_height() - height) // 2
-        self.geometry(f"+{x}+{y}")
-        
-        # Apply glassmorphism background (if supported by OS)
-        # Note: Real blur requires platform-specific code, using semi-transparent fallback
-        self.configure(bg="#F0F4F8")  # Light mode default
-        
-        # Create main scrollable container
-        self.canvas = tk.Canvas(self, bg="#F0F4F8", highlightthickness=0)
-        self.scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
-        self.scrollable_frame = ttk.Frame(self.canvas)
-        
-        self.scrollable_frame.bind(
-            "<Configure>",
-            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-        )
-        
-        self.canvas_window = self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
-        self.canvas.configure(yscrollcommand=self.scrollbar.set)
-        
-        # Bind canvas resize to adjust frame width
-        self.canvas.bind("<Configure>", self._on_canvas_configure)
-        
-        # Mouse wheel scrolling
-        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
-        self.canvas.bind_all("<Button-4>", self._on_mousewheel)  # Linux
-        self.canvas.bind_all("<Button-5>", self._on_mousewheel)  # Linux
-        
-        # Layout
-        self.canvas.pack(side="left", fill="both", expand=True)
-        self.scrollbar.pack(side="right", fill="y")
-        
+            self.setMinimumSize(700, 550)
+        else:
+            self.setFixedSize(width, height)
+
+        # Apply glassmorphism background
+        self.setStyleSheet("background-color: #F0F4F8;")
+
+        # Create main layout
+        main_layout = QtWidgets.QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+
+        # Create scroll area
+        self.scroll_area = QtWidgets.QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        self.scroll_area.setStyleSheet("QScrollArea { background-color: #F0F4F8; border: none; }")
+
+        # Create scrollable content frame
+        self.scrollable_frame = QtWidgets.QWidget()
+        self.scrollable_layout = QtWidgets.QVBoxLayout(self.scrollable_frame)
+        self.scrollable_layout.setContentsMargins(20, 20, 20, 20)
+        self.scrollable_layout.setSpacing(10)
+
+        self.scroll_area.setWidget(self.scrollable_frame)
+
+        main_layout.addWidget(self.scroll_area)
+
         # Store reference to app state
         from ui_theme import get_color
         self.get_color = get_color
-        
+
         # Apply theme
         self.apply_theme()
-        
-    def _on_canvas_configure(self, event):
-        """Adjust scrollable frame width to match canvas"""
-        self.canvas.itemconfig(self.canvas_window, width=event.width)
-        
-    def _on_mousewheel(self, event):
-        """Handle mouse wheel scrolling"""
-        if event.num == 4 or event.delta > 0:
-            self.canvas.yview_scroll(-1, "units")
-        elif event.num == 5 or event.delta < 0:
-            self.canvas.yview_scroll(1, "units")
-            
+
     def apply_theme(self):
         """Apply current theme colors"""
         bg_color = self.get_color("bg_primary")
-        self.configure(bg=bg_color)
-        self.canvas.configure(bg=bg_color)
-        
-    def get_content_frame(self) -> ttk.Frame:
+        self.setStyleSheet(f"background-color: {bg_color};")
+        self.scroll_area.setStyleSheet(f"QScrollArea {{ background-color: {bg_color}; border: none; }}")
+
+    def get_content_frame(self) -> QtWidgets.QWidget:
         """Return the scrollable content frame for adding widgets"""
         return self.scrollable_frame
-    
+
     def add_button_bar(self, buttons: list, pady: int = 20):
         """
         Add a responsive button bar at the bottom of the popup
-        Buttons automatically wrap if window is too narrow
         """
-        button_frame = ttk.Frame(self.scrollable_frame)
-        button_frame.pack(fill="x", padx=40, pady=pady)
-        
+        button_widget = QtWidgets.QWidget()
+        button_layout = QtWidgets.QHBoxLayout(button_widget)
+        button_layout.setContentsMargins(40, pady, 40, pady)
+        button_layout.setSpacing(10)
+
         for btn_config in buttons:
-            btn = ttk.Button(
-                button_frame, 
-                text=btn_config.get("text", "Action"),
-                command=btn_config.get("command", lambda: None),
-                style=btn_config.get("style", "Accent.TButton")
-            )
-            btn.pack(side="left", padx=5, expand=False, fill="x")
-            
-        return button_frame
+            btn = QtWidgets.QPushButton(btn_config.get("text", "Action"))
+            btn.clicked.connect(btn_config.get("command", lambda: None))
+
+            # Apply accent style if specified
+            if btn_config.get("style") == "Accent.TButton":
+                btn.setProperty("class", "accent-button")
+
+            button_layout.addWidget(btn)
+
+        # Add spacer to push buttons to the left (or center if desired)
+        button_layout.addStretch()
+
+        # Add to scrollable content
+        self.scrollable_layout.addWidget(button_widget)
+
+        return button_widget
 
 
 # Global instance
