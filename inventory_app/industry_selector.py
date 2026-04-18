@@ -20,7 +20,7 @@ def create_industry_selector_card(parent, on_industry_changed=None):
     Creates a modern industry selection card for the dashboard.
     Renamed to match dashboard_ui expectations.
     """
-    container = make_card(parent, padx=30, pady=30)
+    container = make_card(parent, padding=30)
     layout = QVBoxLayout(container)
 
     # Title & Subtitle
@@ -28,9 +28,9 @@ def create_industry_selector_card(parent, on_industry_changed=None):
     header_layout = QVBoxLayout(header_frame)
     header_layout.setContentsMargins(0, 0, 0, 0)
 
-    styled_label(header_layout, "🎯 Industry vertical", font=FONT_HEADING)
-    styled_label(header_layout, "Select your primary business type to enable specialized features",
-                font=FONT_SMALL, foreground=get_color('text_muted'))
+    styled_label(header_frame, "🎯 Industry vertical", font=FONT_HEADING)
+    styled_label(header_frame, "Select your primary business type to enable specialized features",
+                font=FONT_SMALL)
 
     layout.addWidget(header_frame)
 
@@ -59,12 +59,10 @@ def create_industry_selector_card(parent, on_industry_changed=None):
         card_layout = QVBoxLayout(opt_card)
 
         # Icon & Name
-        styled_label(card_layout, f"{config['icon']} {config['name']}", font=FONT_BOLD,
-                    background=get_color('app_bg'))
+        styled_label(opt_card, f"{config['icon']} {config['name']}", font=FONT_BOLD)
 
         # Description
-        desc_label = styled_label(card_layout, config['description'], font=FONT_SMALL,
-                    foreground=get_color('text_muted'), background=get_color('app_bg'))
+        desc_label = styled_label(opt_card, config['description'], font=FONT_SMALL)
         desc_label.setWordWrap(True)
         desc_label.setMaximumWidth(200)
 
@@ -79,7 +77,7 @@ def create_industry_selector_card(parent, on_industry_changed=None):
             else:
                 QMessageBox.critical(container, "Error", "Failed to update industry setting.")
 
-        make_button(card_layout, btn_text, command=make_select_cmd, kind=btn_kind)
+        make_button(opt_card, btn_text, slot=make_select_cmd, kind=btn_kind)
 
         grid_layout.addWidget(opt_card, row, col)
 

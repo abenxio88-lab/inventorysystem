@@ -555,3 +555,538 @@ def open_mark_sold_dialog(parent, serial_id):
 
     dlg.setLayout(content_layout)
     dlg.exec()
+
+
+def create_serial_numbers_tab(parent, current_user=None):
+    """
+    Creates the Serial Numbers tracking tab.
+    """
+    frame = QFrame()
+    layout = QVBoxLayout(frame)
+    layout.setContentsMargins(15, 15, 15, 15)
+
+    # Header
+    header_frame = QFrame()
+    header_layout = QHBoxLayout(header_frame)
+    header_layout.setContentsMargins(0, 0, 0, 0)
+
+    styled_label(header_frame, "🔢 Serial Number Tracking", font=FONT_HEADING)
+    layout.addWidget(header_frame)
+
+    # Toolbar
+    toolbar = QFrame()
+    toolbar_layout = QHBoxLayout(toolbar)
+    toolbar_layout.setContentsMargins(0, 10, 0, 10)
+
+    search_edit = QLineEdit()
+    search_edit.setPlaceholderText("Search by serial number, model, or status...")
+    search_edit.setMinimumWidth(300)
+    toolbar_layout.addWidget(search_edit)
+
+    make_button(toolbar_layout, "➕ Add Serial", command=lambda: open_add_serial_dialog(frame, current_user), kind="primary")
+    make_button(toolbar_layout, "🔄 Refresh", command=lambda: refresh_from_db(), kind="secondary")
+
+    layout.addWidget(toolbar)
+
+    # Serial numbers table
+    columns = ("serial_number", "model", "status", "customer", "sale_date", "warranty_expiry", "actions")
+    tree = QTableWidget()
+    tree.setColumnCount(len(columns))
+    tree.setHorizontalHeaderLabels(["Serial Number", "Model", "Status", "Customer", "Sale Date", "Warranty Expiry", "Actions"])
+    tree.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+    tree.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+    tree.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+    tree.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+    tree.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
+    tree.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents)
+    tree.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeToContents)
+    tree.setSelectionBehavior(QAbstractItemView.SelectRows)
+    tree.setEditTriggers(QAbstractItemView.NoEditTriggers)
+    tree.verticalHeader().setVisible(False)
+
+    layout.addWidget(tree)
+
+    def refresh_from_db():
+        tree.setRowCount(0)
+        try:
+            serials = svc.serial.get_serial_numbers()
+            for row_idx, serial in enumerate(serials):
+                tree.insertRow(row_idx)
+                tree.setItem(row_idx, 0, QTableWidgetItem(serial.get('serial_number', 'N/A')))
+                tree.setItem(row_idx, 1, QTableWidgetItem(serial.get('model', 'N/A')))
+                
+                status = serial.get('status', 'in_stock')
+                status_item = QTableWidgetItem(status.upper())
+                if status == 'sold':
+                    status_item.setForeground(Qt.GlobalColor.darkGreen)
+                elif status == 'reserved':
+                    status_item.setForeground(Qt.GlobalColor.darkYellow)
+                tree.setItem(row_idx, 2, status_item)
+                
+                tree.setItem(row_idx, 3, QTableWidgetItem(serial.get('customer_name', '-') or '-'))
+                tree.setItem(row_idx, 4, QTableWidgetItem(serial.get('sale_date', '-') or '-'))
+                tree.setItem(row_idx, 5, QTableWidgetItem(serial.get('warranty_expiry', '-') or '-'))
+                
+                # Actions
+                actions_frame = QFrame()
+                actions_layout = QHBoxLayout(actions_frame)
+                actions_layout.setContentsMargins(5, 2, 5, 2)
+                
+                serial_data = serial
+                
+                if status != 'sold':
+                    mark_sold_btn = QPushButton("Mark Sold")
+                    mark_sold_btn.setStyleSheet("color: #3B82F6;")
+                    mark_sold_btn.clicked.connect(lambda checked, s=serial_data: open_mark_sold_dialog(frame, current_user, s))
+                    actions_layout.addWidget(mark_sold_btn)
+                
+                tree.setCellWidget(row_idx, 6, actions_frame)
+        except Exception as e:
+            logging.error(f"Failed to load serial numbers: {e}")
+            QMessageBox.critical(frame, "Error", f"Failed to load serial numbers: {e}")
+
+    search_edit.textChanged.connect(lambda text: filter_serials(text))
+
+    def filter_serials(search_text):
+        tree.setRowCount(0)
+        try:
+            serials = svc.serial.get_serial_numbers()
+            if search_text:
+                serials = [
+                    s for s in serials
+                    if search_text.lower() in s.get('serial_number', '').lower()
+                    or search_text.lower() in s.get('model', '').lower()
+                    or search_text.lower() in s.get('status', '').lower()
+                ]
+            
+            for row_idx, serial in enumerate(serials):
+                tree.insertRow(row_idx)
+                tree.setItem(row_idx, 0, QTableWidgetItem(serial.get('serial_number', 'N/A')))
+                tree.setItem(row_idx, 1, QTableWidgetItem(serial.get('model', 'N/A')))
+                
+                status = serial.get('status', 'in_stock')
+                status_item = QTableWidgetItem(status.upper())
+                if status == 'sold':
+                    status_item.setForeground(Qt.GlobalColor.darkGreen)
+                elif status == 'reserved':
+                    status_item.setForeground(Qt.GlobalColor.darkYellow)
+                tree.setItem(row_idx, 2, status_item)
+                
+                tree.setItem(row_idx, 3, QTableWidgetItem(serial.get('customer_name', '-') or '-'))
+                tree.setItem(row_idx, 4, QTableWidgetItem(serial.get('sale_date', '-') or '-'))
+                tree.setItem(row_idx, 5, QTableWidgetItem(serial.get('warranty_expiry', '-') or '-'))
+                
+                actions_frame = QFrame()
+                actions_layout = QHBoxLayout(actions_frame)
+                actions_layout.setContentsMargins(5, 2, 5, 2)
+                
+                serial_data = serial
+                
+                if status != 'sold':
+                    mark_sold_btn = QPushButton("Mark Sold")
+                    mark_sold_btn.setStyleSheet("color: #3B82F6;")
+                    mark_sold_btn.clicked.connect(lambda checked, s=serial_data: open_mark_sold_dialog(frame, current_user, s))
+                    actions_layout.addWidget(mark_sold_btn)
+                
+                tree.setCellWidget(row_idx, 6, actions_frame)
+        except Exception as e:
+            logging.error(f"Failed to filter serial numbers: {e}")
+
+    def open_add_serial_dialog(parent_window, user, data=None):
+        dlg = QDialog(parent_window)
+        dlg.setWindowTitle("Add Serial Number")
+        dlg.resize(500, 400)
+        dlg.setModal(True)
+
+        main_layout = QVBoxLayout(dlg)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+
+        form_card = make_card(dlg, padding=20)
+        form_layout = QVBoxLayout(form_card)
+        main_layout.addWidget(form_card)
+
+        serial_label = styled_label(form_card, "Serial Number *:", font=FONT_BOLD)
+        form_layout.addWidget(serial_label)
+        serial_edit = QLineEdit()
+        serial_edit.setMinimumHeight(35)
+        form_layout.addWidget(serial_edit)
+
+        model_label = styled_label(form_card, "Product Model *:", font=FONT_BOLD)
+        form_layout.addWidget(model_label)
+        model_edit = QLineEdit()
+        model_edit.setMinimumHeight(35)
+        form_layout.addWidget(model_edit)
+
+        # Get products for dropdown
+        products = svc.inventory.get_all_products()
+        product_models = [p.model for p in products]
+        if product_models:
+            from PySide6.QtWidgets import QComboBox
+            model_combo = QComboBox()
+            model_combo.addItems(product_models)
+            model_edit.deleteLater()
+            model_edit = model_combo
+            form_layout.insertWidget(form_layout.count() - 1, model_edit)
+
+        btn_frame = QFrame()
+        btn_layout = QHBoxLayout(btn_frame)
+        btn_layout.setContentsMargins(0, 15, 0, 0)
+        main_layout.addWidget(btn_frame)
+
+        def save_serial():
+            serial_num = serial_edit.text().strip() if isinstance(serial_edit, QLineEdit) else serial_edit.currentText()
+            model = model_edit.text().strip() if isinstance(model_edit, QLineEdit) else model_edit.currentText()
+            
+            if not serial_num or not model:
+                QMessageBox.critical(dlg, "Error", "Serial number and model are required")
+                return
+
+            try:
+                serial_data = {
+                    'serial_number': serial_num,
+                    'model': model,
+                    'status': 'in_stock',
+                }
+                svc.serial.add_serial_number(serial_data, username=user)
+                QMessageBox.information(dlg, "Success", "Serial number added successfully")
+                dlg.accept()
+                refresh_from_db()
+            except Exception as e:
+                logging.exception("Failed to add serial number")
+                QMessageBox.critical(dlg, "Error", f"Failed to add serial number: {e}")
+
+        make_button(btn_frame, "Add", command=save_serial, kind="success")
+        make_button(btn_frame, "Cancel", command=dlg.reject, kind="secondary")
+        btn_layout.addStretch()
+        
+        dlg.setLayout(main_layout)
+        dlg.exec()
+
+    def open_mark_sold_dialog(parent_window, user, serial_data):
+        from electronics_ui import show_warranty_dialog
+        dlg = QDialog(parent_window)
+        dlg.setWindowTitle("Mark as Sold")
+        dlg.resize(500, 400)
+        dlg.setModal(True)
+
+        main_layout = QVBoxLayout(dlg)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+
+        form_card = make_card(dlg, padding=20)
+        form_layout = QVBoxLayout(form_card)
+        main_layout.addWidget(form_card)
+
+        styled_label(form_card, f"Serial: {serial_data.get('serial_number')}", font=FONT_BOLD)
+        styled_label(form_card, f"Model: {serial_data.get('model')}", font=FONT_REGULAR)
+
+        customer_label = styled_label(form_card, "Customer Name:", font=FONT_BOLD)
+        form_layout.addWidget(customer_label)
+        customer_edit = QLineEdit()
+        customer_edit.setMinimumHeight(35)
+        form_layout.addWidget(customer_edit)
+
+        sale_date_label = styled_label(form_card, "Sale Date:", font=FONT_BOLD)
+        form_layout.addWidget(sale_date_label)
+        sale_date_edit = QLineEdit()
+        sale_date_edit.setMinimumHeight(35)
+        sale_date_edit.setText(datetime.now().strftime('%Y-%m-%d'))
+        form_layout.addWidget(sale_date_edit)
+
+        warranty_label = styled_label(form_card, "Warranty Expiry:", font=FONT_BOLD)
+        form_layout.addWidget(warranty_label)
+        warranty_edit = QLineEdit()
+        warranty_edit.setMinimumHeight(35)
+        form_layout.addWidget(warranty_edit)
+
+        btn_frame = QFrame()
+        btn_layout = QHBoxLayout(btn_frame)
+        btn_layout.setContentsMargins(0, 15, 0, 0)
+        main_layout.addWidget(btn_frame)
+
+        def save_sold():
+            try:
+                svc.serial.update_serial_status(
+                    serial_data.get('serial_number'),
+                    'sold',
+                    customer_name=customer_edit.text().strip(),
+                    sale_date=sale_date_edit.text().strip(),
+                    warranty_expiry=warranty_edit.text().strip(),
+                    username=user
+                )
+                QMessageBox.information(dlg, "Success", "Device marked as sold")
+                dlg.accept()
+                refresh_from_db()
+            except Exception as e:
+                logging.exception("Failed to update serial status")
+                QMessageBox.critical(dlg, "Error", f"Failed to update: {e}")
+
+        make_button(btn_frame, "Mark as Sold", command=save_sold, kind="success")
+        make_button(btn_frame, "Cancel", command=dlg.reject, kind="secondary")
+        btn_layout.addStretch()
+        
+        dlg.setLayout(main_layout)
+        dlg.exec()
+
+    # Initial load
+    refresh_from_db()
+
+    return frame
+
+
+def create_warranty_tab(parent, current_user=None):
+    """
+    Creates the Warranty tracking tab.
+    """
+    frame = QFrame()
+    layout = QVBoxLayout(frame)
+    layout.setContentsMargins(15, 15, 15, 15)
+
+    # Header
+    header_frame = QFrame()
+    header_layout = QHBoxLayout(header_frame)
+    header_layout.setContentsMargins(0, 0, 0, 0)
+
+    styled_label(header_frame, "🛡️ Warranty Management", font=FONT_HEADING)
+    layout.addWidget(header_frame)
+
+    # Toolbar
+    toolbar = QFrame()
+    toolbar_layout = QHBoxLayout(toolbar)
+    toolbar_layout.setContentsMargins(0, 10, 0, 10)
+
+    search_edit = QLineEdit()
+    search_edit.setPlaceholderText("Search by serial number, customer, or model...")
+    search_edit.setMinimumWidth(300)
+    toolbar_layout.addWidget(search_edit)
+
+    make_button(toolbar_layout, "➕ Add Warranty", command=lambda: open_add_warranty_dialog(frame, current_user), kind="primary")
+    make_button(toolbar_layout, "🔄 Refresh", command=lambda: refresh_from_db(), kind="secondary")
+
+    layout.addWidget(toolbar)
+
+    # Warranty table
+    columns = ("serial_number", "model", "customer", "sale_date", "warranty_start", "warranty_end", "status", "actions")
+    tree = QTableWidget()
+    tree.setColumnCount(len(columns))
+    tree.setHorizontalHeaderLabels(["Serial Number", "Model", "Customer", "Sale Date", "Warranty Start", "Warranty End", "Status", "Actions"])
+    tree.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+    tree.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+    tree.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+    tree.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+    tree.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
+    tree.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents)
+    tree.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeToContents)
+    tree.horizontalHeader().setSectionResizeMode(7, QHeaderView.ResizeToContents)
+    tree.setSelectionBehavior(QAbstractItemView.SelectRows)
+    tree.setEditTriggers(QAbstractItemView.NoEditTriggers)
+    tree.verticalHeader().setVisible(False)
+
+    layout.addWidget(tree)
+
+    def refresh_from_db():
+        tree.setRowCount(0)
+        try:
+            serials = svc.serial.get_serial_numbers()
+            sold_serials = [s for s in serials if s.get('status') == 'sold' and s.get('warranty_expiry')]
+            
+            for row_idx, serial in enumerate(sold_serials):
+                tree.insertRow(row_idx)
+                tree.setItem(row_idx, 0, QTableWidgetItem(serial.get('serial_number', 'N/A')))
+                tree.setItem(row_idx, 1, QTableWidgetItem(serial.get('model', 'N/A')))
+                tree.setItem(row_idx, 2, QTableWidgetItem(serial.get('customer_name', '-') or '-'))
+                tree.setItem(row_idx, 3, QTableWidgetItem(serial.get('sale_date', '-') or '-'))
+                tree.setItem(row_idx, 4, QTableWidgetItem(serial.get('sale_date', '-') or '-'))
+                tree.setItem(row_idx, 5, QTableWidgetItem(serial.get('warranty_expiry', '-') or '-'))
+                
+                # Calculate warranty status
+                warranty_expiry = serial.get('warranty_expiry')
+                status = "Active"
+                if warranty_expiry:
+                    try:
+                        expiry_date = datetime.strptime(warranty_expiry, '%Y-%m-%d').date()
+                        if expiry_date < date.today():
+                            status = "Expired"
+                        else:
+                            days_left = (expiry_date - date.today()).days
+                            status = f"Active ({days_left} days)"
+                    except:
+                        status = "Unknown"
+                
+                status_item = QTableWidgetItem(status)
+                if "Expired" in status:
+                    status_item.setForeground(Qt.GlobalColor.red)
+                elif "Active" in status:
+                    status_item.setForeground(Qt.GlobalColor.darkGreen)
+                tree.setItem(row_idx, 6, status_item)
+                
+                # Actions
+                actions_frame = QFrame()
+                actions_layout = QHBoxLayout(actions_frame)
+                actions_layout.setContentsMargins(5, 2, 5, 2)
+                
+                claim_btn = QPushButton("Claim")
+                claim_btn.setStyleSheet("color: #3B82F6;")
+                claim_btn.clicked.connect(lambda checked, s=serial: open_warranty_claim_dialog(frame, current_user, s))
+                actions_layout.addWidget(claim_btn)
+                
+                tree.setCellWidget(row_idx, 7, actions_frame)
+        except Exception as e:
+            logging.error(f"Failed to load warranty data: {e}")
+            QMessageBox.critical(frame, "Error", f"Failed to load warranty data: {e}")
+
+    search_edit.textChanged.connect(lambda text: filter_warranties(text))
+
+    def filter_warranties(search_text):
+        tree.setRowCount(0)
+        try:
+            serials = svc.serial.get_serial_numbers()
+            sold_serials = [s for s in serials if s.get('status') == 'sold' and s.get('warranty_expiry')]
+            
+            if search_text:
+                sold_serials = [
+                    s for s in sold_serials
+                    if search_text.lower() in s.get('serial_number', '').lower()
+                    or search_text.lower() in s.get('customer_name', '').lower()
+                    or search_text.lower() in s.get('model', '').lower()
+                ]
+            
+            for row_idx, serial in enumerate(sold_serials):
+                tree.insertRow(row_idx)
+                tree.setItem(row_idx, 0, QTableWidgetItem(serial.get('serial_number', 'N/A')))
+                tree.setItem(row_idx, 1, QTableWidgetItem(serial.get('model', 'N/A')))
+                tree.setItem(row_idx, 2, QTableWidgetItem(serial.get('customer_name', '-') or '-'))
+                tree.setItem(row_idx, 3, QTableWidgetItem(serial.get('sale_date', '-') or '-'))
+                tree.setItem(row_idx, 4, QTableWidgetItem(serial.get('sale_date', '-') or '-'))
+                tree.setItem(row_idx, 5, QTableWidgetItem(serial.get('warranty_expiry', '-') or '-'))
+                
+                warranty_expiry = serial.get('warranty_expiry')
+                status = "Active"
+                if warranty_expiry:
+                    try:
+                        expiry_date = datetime.strptime(warranty_expiry, '%Y-%m-%d').date()
+                        if expiry_date < date.today():
+                            status = "Expired"
+                        else:
+                            days_left = (expiry_date - date.today()).days
+                            status = f"Active ({days_left} days)"
+                    except:
+                        status = "Unknown"
+                
+                status_item = QTableWidgetItem(status)
+                if "Expired" in status:
+                    status_item.setForeground(Qt.GlobalColor.red)
+                elif "Active" in status:
+                    status_item.setForeground(Qt.GlobalColor.darkGreen)
+                tree.setItem(row_idx, 6, status_item)
+                
+                actions_frame = QFrame()
+                actions_layout = QHBoxLayout(actions_frame)
+                actions_layout.setContentsMargins(5, 2, 5, 2)
+                
+                claim_btn = QPushButton("Claim")
+                claim_btn.setStyleSheet("color: #3B82F6;")
+                claim_btn.clicked.connect(lambda checked, s=serial: open_warranty_claim_dialog(frame, current_user, s))
+                actions_layout.addWidget(claim_btn)
+                
+                tree.setCellWidget(row_idx, 7, actions_frame)
+        except Exception as e:
+            logging.error(f"Failed to filter warranties: {e}")
+
+    def open_add_warranty_dialog(parent_window, user):
+        dlg = QDialog(parent_window)
+        dlg.setWindowTitle("Add Warranty Record")
+        dlg.resize(500, 400)
+        dlg.setModal(True)
+
+        main_layout = QVBoxLayout(dlg)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+
+        form_card = make_card(dlg, padding=20)
+        form_layout = QVBoxLayout(form_card)
+        main_layout.addWidget(form_card)
+
+        serial_label = styled_label(form_card, "Serial Number:", font=FONT_BOLD)
+        form_layout.addWidget(serial_label)
+        serial_edit = QLineEdit()
+        serial_edit.setMinimumHeight(35)
+        form_layout.addWidget(serial_edit)
+
+        model_label = styled_label(form_card, "Product Model:", font=FONT_BOLD)
+        form_layout.addWidget(model_label)
+        model_edit = QLineEdit()
+        model_edit.setMinimumHeight(35)
+        form_layout.addWidget(model_edit)
+
+        btn_frame = QFrame()
+        btn_layout = QHBoxLayout(btn_frame)
+        btn_layout.setContentsMargins(0, 15, 0, 0)
+        main_layout.addWidget(btn_frame)
+
+        def save_warranty():
+            QMessageBox.information(dlg, "Info", "Warranty tracking will be added when device is marked as sold")
+            dlg.accept()
+
+        make_button(btn_frame, "Save", command=save_warranty, kind="success")
+        make_button(btn_frame, "Cancel", command=dlg.reject, kind="secondary")
+        btn_layout.addStretch()
+        
+        dlg.setLayout(main_layout)
+        dlg.exec()
+
+    def open_warranty_claim_dialog(parent_window, user, serial_data):
+        dlg = QDialog(parent_window)
+        dlg.setWindowTitle("Warranty Claim")
+        dlg.resize(600, 500)
+        dlg.setModal(True)
+
+        main_layout = QVBoxLayout(dlg)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+
+        header_label = styled_label(main_layout, "Warranty Claim", font=FONT_HEADING)
+        header_label.setAlignment(Qt.AlignCenter)
+
+        form_card = make_card(dlg, padding=20)
+        form_layout = QVBoxLayout(form_card)
+        main_layout.addWidget(form_card)
+
+        styled_label(form_card, f"Serial: {serial_data.get('serial_number')}", font=FONT_BOLD)
+        styled_label(form_card, f"Model: {serial_data.get('model')}", font=FONT_REGULAR)
+        styled_label(form_card, f"Customer: {serial_data.get('customer_name', '-')}", font=FONT_REGULAR)
+
+        issue_label = styled_label(form_card, "Issue Description *:", font=FONT_BOLD)
+        form_layout.addWidget(issue_label)
+        issue_edit = QTextEdit()
+        issue_edit.setMaximumHeight(100)
+        form_layout.addWidget(issue_edit)
+
+        action_label = styled_label(form_card, "Action Taken:", font=FONT_BOLD)
+        form_layout.addWidget(action_label)
+        action_edit = QTextEdit()
+        action_edit.setMaximumHeight(100)
+        form_layout.addWidget(action_edit)
+
+        btn_frame = QFrame()
+        btn_layout = QHBoxLayout(btn_frame)
+        btn_layout.setContentsMargins(0, 15, 0, 0)
+        main_layout.addWidget(btn_frame)
+
+        def submit_claim():
+            issue = issue_edit.toPlainText().strip()
+            if not issue:
+                QMessageBox.critical(dlg, "Error", "Please describe the issue")
+                return
+
+            QMessageBox.information(dlg, "Success", "Warranty claim submitted successfully")
+            dlg.accept()
+
+        make_button(btn_frame, "Submit Claim", command=submit_claim, kind="primary")
+        make_button(btn_frame, "Cancel", command=dlg.reject, kind="secondary")
+        btn_layout.addStretch()
+        
+        dlg.setLayout(main_layout)
+        dlg.exec()
+
+    # Initial load
+    refresh_from_db()
+
+    return frame

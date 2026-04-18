@@ -10,7 +10,7 @@ import logging
 from datetime import datetime
 
 from ui_theme import (
-    make_card, styled_label, make_button,
+    make_card, styled_label, make_button, label,
     FONT_HEADING, FONT_BOLD, FONT_REGULAR,
     COLOR_PRIMARY, COLOR_SUCCESS, COLOR_DANGER, COLOR_WARNING, COLOR_TEXT_MUTED
 )
@@ -437,6 +437,9 @@ def open_create_return_dialog(parent, current_user=None):
     cancel_btn = make_button(btn_frame, "Cancel", command=dlg.reject, kind="secondary")
     btn_layout.addWidget(cancel_btn)
     btn_layout.addStretch()
+    
+    dlg.setLayout(main_layout)
+    dlg.exec()
 
 
 def open_return_details(parent, return_number, current_user=None):

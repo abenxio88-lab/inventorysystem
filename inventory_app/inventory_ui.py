@@ -451,7 +451,7 @@ def create_inventory_tab(parent, current_user="Unknown"):
             _show_error(window, "Permission Denied", "Only admins can run backups")
             return
         try:
-            from backup_manager import backup_data
+            from utils import backup_data
             dest = backup_data()
             _show_info(window, "Backup", f"Data backed up to: {dest}")
         except Exception:

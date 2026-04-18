@@ -8,7 +8,7 @@ from PySide6 import QtWidgets, QtCore, QtGui
 import logging
 from datetime import datetime
 
-from ui_theme import make_card, styled_label, make_button, FONT_REGULAR, FONT_BOLD, COLOR_PRIMARY, COLOR_SUCCESS, COLOR_DANGER, COLOR_WARNING
+from ui_theme import make_card, styled_label, make_button, label, FONT_REGULAR, FONT_BOLD, COLOR_PRIMARY, COLOR_SUCCESS, COLOR_DANGER, COLOR_WARNING
 from services import svc
 
 
@@ -397,6 +397,9 @@ def open_transfer_dialog(parent, current_user=None):
     cancel_btn = make_button(btn_frame, "Cancel", command=dlg.reject, kind="secondary")
     btn_layout.addWidget(cancel_btn)
     btn_layout.addStretch()
+    
+    dlg.setLayout(main_layout)
+    dlg.exec()
 
 
 def open_transfer_details(parent, transfer_number):

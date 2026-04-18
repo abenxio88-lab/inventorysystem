@@ -10,19 +10,17 @@ from PySide6 import QtWidgets, QtCore, QtGui
 # Project imports
 from services import svc
 from ui_theme import (
-    toggle_theme, get_color, make_button, make_card, styled_label, styled_entry,
-    frame, label, entry, combobox, treeview,
+    make_button, make_card, styled_label,
     COLOR_PRIMARY, COLOR_BORDER, COLOR_TEXT_MUTED, COLOR_TEXT_MAIN, COLOR_APP_BG, COLOR_INFO,
-    COLOR_SUCCESS, COLOR_DANGER, COLOR_WARNING, COLOR_CARD_BG,
-    BTN_WIDTH, FONT_BOLD, FONT_HEADING, FONT_REGULAR, SUBHEADING_FONT, FONT_SMALL,
-    get_palette, create_divider, make_glass_card, create_badge, create_status_badge
+    COLOR_SUCCESS, COLOR_DANGER, COLOR_WARNING,
+    BTN_WIDTH, FONT_BOLD, FONT_HEADING, FONT_REGULAR, SUBHEADING_FONT, FONT_SMALL
 )
 from migration_add_industry_type import get_industry_type, get_industry_metadata
 from industry_selector import create_industry_selector_card
 from users_ui import open_user_manager
 from audit_ui import open_audit_viewer
 from setup_licensing_ui import open_owner_dashboard
-from utils import load_settings, save_settings, get_data_dir, load_json_file
+from utils import load_settings, save_settings
 
 
 def create_dashboard_tab(parent, username, role, switch_tab_callback=None):

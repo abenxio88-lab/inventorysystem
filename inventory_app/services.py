@@ -416,6 +416,18 @@ class CustomerService:
                                 f"Updated customer: {customer_id}")
         return success
 
+    def create_customer(self, data: dict, username: str = "system") -> int:
+        """Alias for add_customer for consistency."""
+        return self.add_customer(data, username=username)
+
+    def delete_customer(self, customer_id: int, username: str = "system") -> bool:
+        """Delete a customer."""
+        success = self.db.delete_customer(customer_id)
+        if success:
+            self.db.audit_event(username, "delete_customer", "customers", customer_id,
+                                f"Deleted customer: {customer_id}")
+        return success
+
 
 class InvoiceService:
     """Business logic for invoices."""

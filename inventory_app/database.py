@@ -461,6 +461,12 @@ class InventoryDB:
             cur.execute(f"UPDATE customers SET {set_clause} WHERE id = ?", values)
             return cur.rowcount > 0
 
+    def delete_customer(self, customer_id: int) -> bool:
+        """Delete a customer by ID."""
+        with get_db_cursor() as cur:
+            cur.execute("DELETE FROM customers WHERE id = ?", (customer_id,))
+            return cur.rowcount > 0
+
     # ── INVOICES ──────────────────────────────────────────
 
     def fetch_invoices(self, status: Optional[str] = None) -> List[dict]:
@@ -1188,6 +1194,71 @@ class InventoryDB:
                     except Exception as e:
                         logger.error(f"Failed to import row into {table}: {e}")
         return True
+
+    # ============================================================
+    # Prescription Management Methods (Pharma-specific)
+    # ============================================================
+
+    def fetch_prescriptions(self, status=None):
+        """Fetch prescriptions from the database."""
+        query = "SELECT * FROM prescriptions"
+        params = []
+
+        if status:
+            query += " WHERE status = ?"
+            params.append(status)
+
+        query += " ORDER BY created_at DESC"
+
+        with get_db_cursor() as cur:
+            cur.execute(query, params)
+            return cur.fetchall()
+
+    def insert_prescription(self, data):
+        """Create a new prescription."""
+        with get_db_cursor() as cur:
+            cur.execute(
+                """INSERT INTO prescriptions
+                   (rx_number, patient_name, patient_phone, doctor_name, 
+                    prescribed_date, expiry_date, medication_name, dosage,
+                    refills_allowed, refills_used, status, notes, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    data.get("rx_number"),
+                    data.get("patient_name"),
+                    data.get("patient_phone"),
+                    data.get("doctor_name"),
+                    data.get("prescribed_date"),
+                    data.get("expiry_date"),
+                    data.get("medication_name"),
+                    data.get("dosage"),
+                    data.get("refills_allowed", 0),
+                    data.get("refills_used", 0),
+                    data.get("status", "pending"),
+                    data.get("notes"),
+                    data.get("created_at")
+                )
+            )
+            rx_id = cur.lastrowid
+            return rx_id
+
+    def verify_prescription(self, rx_number, verified_by):
+        """Verify a prescription."""
+        with get_db_cursor() as cur:
+            cur.execute(
+                "UPDATE prescriptions SET status = 'verified', verified_by = ?, verified_at = CURRENT_TIMESTAMP WHERE rx_number = ?",
+                (verified_by, rx_number)
+            )
+            return cur.rowcount > 0
+
+    def mark_prescription_filled(self, rx_number):
+        """Mark a prescription as filled."""
+        with get_db_cursor() as cur:
+            cur.execute(
+                "UPDATE prescriptions SET status = 'filled', filled_at = CURRENT_TIMESTAMP WHERE rx_number = ?",
+                (rx_number,)
+            )
+            return cur.rowcount > 0
 
 
 # ============================================================

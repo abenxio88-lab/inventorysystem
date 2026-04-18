@@ -10,7 +10,7 @@ import logging
 from datetime import datetime, timedelta
 
 from services import svc
-from ui_theme import make_card, styled_label, make_button, FONT_REGULAR, FONT_BOLD, COLOR_PRIMARY, COLOR_SUCCESS, COLOR_DANGER, COLOR_WARNING, BTN_WIDTH
+from ui_theme import make_card, styled_label, make_button, label, FONT_REGULAR, FONT_BOLD, COLOR_PRIMARY, COLOR_SUCCESS, COLOR_DANGER, COLOR_WARNING, BTN_WIDTH
 
 
 def _get_suppliers_list():
@@ -514,6 +514,9 @@ def open_create_po_dialog(parent, current_user=None):
 
     # Auto-update total when items change
     update_total()
+    
+    dlg.setLayout(main_layout)
+    dlg.exec()
 
 
 def open_po_details(parent, po_number, current_user=None):

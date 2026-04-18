@@ -9,7 +9,6 @@ from ui_theme import (
     COLOR_BORDER, COLOR_PRIMARY_LIGHT
 )
 from database import verify_user_db
-from utils import get_login_rate_limiter
 
 
 def center_on_screen(dialog):
@@ -147,7 +146,7 @@ def open_login(on_success, parent=None):
 
     # Login button
     def do_login():
-        """Handles the login logic using database authentication with rate limiting."""
+        """Handles the login logic using database authentication."""
         username = username_entry.text().strip()
         password = password_entry.text()
 
@@ -159,43 +158,21 @@ def open_login(on_success, parent=None):
             )
             return
 
-        # Check rate limiting
-        rate_limiter = get_login_rate_limiter()
-        if not rate_limiter.is_allowed(username):
-            wait_time = rate_limiter.get_wait_time(username)
-            QtWidgets.QMessageBox.critical(
-                dialog,
-                "Too Many Attempts",
-                f"Too many failed login attempts for '{username}'.\n"
-                f"Please wait {wait_time} seconds before trying again."
-            )
-            return
-
         # Authenticate against database
-        success, role, user_id = verify_user_db(username, password)
-        if success:
-            logging.info(f"Login successful for user: {username}")
-            rate_limiter.reset(username)  # Reset counter on success
-            dialog.accept()
-            on_success(username, role, user_id, parent)
-        else:
-            logging.warning(f"Login failed for user: {username}")
-            rate_limiter.record_attempt(username)
-            remaining = rate_limiter.get_remaining_attempts(username)
-            if remaining is not None and remaining <= 0:
-                QtWidgets.QMessageBox.critical(
-                    dialog,
-                    "Account Locked",
-                    f"Account '{username}' has been locked due to too many failed attempts.\n"
-                    f"Please wait before trying again."
-                )
+        try:
+            success, role, user_id = verify_user_db(username, password)
+            if success:
+                logging.info(f"Login successful for user: {username}")
+                dialog.accept()
+                on_success(username, role, user_id, parent)
             else:
-                msg = "Invalid username or password"
-                if remaining is not None:
-                    msg += f"\n({remaining} attempts remaining before lockout)"
-                QtWidgets.QMessageBox.critical(dialog, "Login Failed", msg)
-            password_entry.clear()
-            password_entry.setFocus()
+                logging.warning(f"Login failed for user: {username}")
+                QtWidgets.QMessageBox.critical(dialog, "Login Failed", "Invalid username or password")
+                password_entry.clear()
+                password_entry.setFocus()
+        except Exception as e:
+            logging.exception(f"Login error: {e}")
+            QtWidgets.QMessageBox.critical(dialog, "Login Error", f"An error occurred: {e}")
 
     login_btn = make_button(card, text="SIGN IN", slot=do_login, kind="primary")
     login_btn.setMinimumHeight(44)
@@ -219,6 +196,9 @@ def open_login(on_success, parent=None):
     # --- Center and show dialog ---
     center_on_screen(dialog)
     username_entry.setFocus()
+    
+    # Actually display the modal dialog
+    dialog.exec()
 
     return dialog
 

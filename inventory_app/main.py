@@ -340,56 +340,89 @@ class MintakaSphereApp:
 
     def run(self):
         """Run the application."""
-        try:
-            # Create Qt application
-            self.app = QtWidgets.QApplication.instance()
-            if self.app is None:
-                self.app = QtWidgets.QApplication(sys.argv)
-
-            # 1. Database
-            init_database()
-            migrate_database()
-            ensure_default_admin()
-
-            # 2. One-time JSON user migration
+        import os
+        debug_file = os.path.join(os.path.dirname(__file__), "app_debug.log")
+        with open(debug_file, "w") as f:
+            f.write("App starting...\n")
+            f.flush()
+            
             try:
-                count = migrate_json_users_to_db()
-                if count > 0:
-                    report_info(f"Migrated {count} users from JSON to database", module="Auth")
+                # Create Qt application
+                f.write("Creating QApplication...\n")
+                f.flush()
+                self.app = QtWidgets.QApplication.instance()
+                if self.app is None:
+                    self.app = QtWidgets.QApplication(sys.argv)
+                f.write(f"QApplication created: {self.app}\n")
+                f.flush()
+
+                # 1. Database
+                f.write("Initializing database...\n")
+                f.flush()
+                init_database()
+                migrate_database()
+                ensure_default_admin()
+                f.write("Database initialized\n")
+                f.flush()
+
+                # 2. One-time JSON user migration
+                try:
+                    count = migrate_json_users_to_db()
+                    if count > 0:
+                        report_info(f"Migrated {count} users from JSON to database", module="Auth")
+                except Exception as exc:
+                    logging.warning("User migration failed: %s", exc)
+
+                # 3. Create main window
+                f.write("Creating main window...\n")
+                f.flush()
+                self.main_window = QtWidgets.QMainWindow()
+                self.main_window.setWindowTitle("Mintaka Sphere IMS - Loading...")
+                self.main_window.setWindowState(QtCore.Qt.WindowMinimized)
+                f.write("Main window created\n")
+                f.flush()
+
+                # Setup theme
+                f.write("Setting up theme...\n")
+                f.flush()
+                setup_theme(self.main_window, is_dark=(get_color("text_main") == "#FFFFFF"))
+                f.write("Theme setup done\n")
+                f.flush()
+
+                # 4. Show login
+                f.write("Showing login dialog...\n")
+                f.flush()
+                self._show_login()
+                f.write("Login dialog shown\n")
+                f.flush()
+
+                # 5. Start event loop
+                f.write("Starting event loop...\n")
+                f.flush()
+                sys.exit(self.app.exec())
+
             except Exception as exc:
-                logging.warning("User migration failed: %s", exc)
-
-            # 3. Create main window (hidden initially)
-            self.main_window = QtWidgets.QMainWindow()
-            self.main_window.hide()
-
-            # Setup theme
-            setup_theme(self.main_window, is_dark=(get_color("text_main") == "#FFFFFF"))
-
-            # 4. Show login
-            self._show_login()
-
-            # 5. Start event loop
-            sys.exit(self.app.exec())
-
-        except Exception as exc:
-            report_error("Critical application crash during startup", exception=exc, module="Main")
-            try:
-                QtWidgets.QMessageBox.critical(
-                    None,
-                    "Critical Error",
-                    f"The application failed to start:\n{exc}\n\nCheck 'app.log' for details.",
-                )
-            except Exception:
-                print(f"CRITICAL ERROR: {exc}")
+                import traceback
+                error_msg = f"CRITICAL ERROR: {exc}\n{traceback.format_exc()}"
+                f.write(error_msg)
+                f.flush()
+                report_error("Critical application crash during startup", exception=exc, module="Main")
+                try:
+                    QtWidgets.QMessageBox.critical(
+                        None,
+                        "Critical Error",
+                        f"The application failed to start:\n{exc}\n\nCheck 'app.log' for details.",
+                    )
+                except Exception:
+                    print(error_msg)
 
     def _show_login(self):
         """Show the login dialog."""
         def on_login_success(username, role, user_id, login_win=None):
             self._on_login_success(username, role, user_id)
 
-        # Show PySide6 login dialog
-        open_login(on_success=on_login_success, parent=self.main_window)
+        # Show PySide6 login dialog (NO parent = always visible on top)
+        open_login(on_success=on_login_success, parent=None)
 
     def _on_login_success(self, username, role, user_id):
         """Handle successful login and build dashboard."""
