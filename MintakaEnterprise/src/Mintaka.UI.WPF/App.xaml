@@ -1,9 +1,13 @@
 <Application x:Class="Mintaka.UI.WPF.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             StartupUri="Views/MainWindow.xaml">
+             xmlns:converters="clr-namespace:Mintaka.UI.WPF.Converters">
     <Application.Resources>
         <ResourceDictionary>
+            <!-- Converters -->
+            <converters:LoadingConverter x:Key="LoadingConverter"/>
+            <converters:InverseBoolConverter x:Key="InverseBoolConverter"/>
+            
             <!-- Global Styles -->
             <Style TargetType="Button">
                 <Setter Property="Background" Value="#2563eb"/>

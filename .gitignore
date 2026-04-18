@@ -1,59 +1,37 @@
 ```
-# Dependencies
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-env/
-venv/
-ENV/
-.venv/
-.env
-.env.local
-.env.*
-.venv/
-.ENV/
-.envrc
-
 # Build artifacts
-build/
-dist/
-*.egg
-*.egg-info/
-*.so
-*.dylib
+bin/
+obj/
 *.dll
 *.exe
-*.out
-*.o
-*.obj
+*.pdb
+*.userprefs
 
-# Testing
-.coverage
-coverage/
-htmlcov/
-.pytest_cache/
-.hypothesis/
+# Dependencies
+packages/
+node_modules/
+.nuget/
 
 # Logs
 *.log
 
-# Editor/IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*.tmp
+# Environment
+.env
+.env.local
+*.env.*
 
-# OS
+# Editors
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# OS generated files
 .DS_Store
 Thumbs.db
-
-# Python specific
-pip-log.txt
-pip-delete-this-directory.txt
-.tox/
-.coverage*
-nosetests.xml
+ehthumbs.db
+Icon?
+desktop.ini
 ```
