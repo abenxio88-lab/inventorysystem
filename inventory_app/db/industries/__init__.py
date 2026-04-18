@@ -1,1 +1,0 @@
-# Industry-specific database modules

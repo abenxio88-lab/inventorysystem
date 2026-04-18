@@ -1,0 +1,75 @@
+<Window x:Class="Mintaka.UI.WPF.Views.LoginView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Mintaka Inventory - Login" 
+        Height="450" Width="400"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        Background="#f3f4f6">
+    
+    <Grid Margin="40">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Logo and Title -->
+        <StackPanel Grid.Row="0" HorizontalAlignment="Center" Margin="0,0,0,40">
+            <TextBlock Text="🔷" FontSize="48" HorizontalAlignment="Center"/>
+            <TextBlock Text="Mintaka Inventory" 
+                       FontSize="24" 
+                       FontWeight="Bold" 
+                       Foreground="#1f2937"
+                       HorizontalAlignment="Center"
+                       Margin="0,8,0,0"/>
+            <TextBlock Text="Sign in to your account" 
+                       FontSize="14" 
+                       Foreground="#6b7280"
+                       HorizontalAlignment="Center"/>
+        </StackPanel>
+
+        <!-- Login Form -->
+        <StackPanel Grid.Row="1" VerticalAlignment="Center">
+            <!-- Username -->
+            <Label Content="Username" FontWeight="SemiBold"/>
+            <TextBox Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}" 
+                     Margin="0,0,0,16"
+                     Height="44"/>
+
+            <!-- Password -->
+            <Label Content="Password" FontWeight="SemiBold"/>
+            <PasswordBox x:Name="txtPassword" 
+                         Margin="0,0,0,8"
+                         Height="44"
+                         PasswordChanged="PasswordBox_PasswordChanged"/>
+
+            <!-- Error Message -->
+            <TextBlock Text="{Binding ErrorMessage}" 
+                       Foreground="#dc2626" 
+                       FontSize="13"
+                       Margin="0,0,0,16"
+                       TextWrapping="Wrap"/>
+
+            <!-- Login Button -->
+            <Button Content="{Binding IsLoading, Converter={StaticResource LoadingConverter}, FallbackValue='Sign In'}" 
+                    Command="{Binding LoginCommand}"
+                    Height="44"
+                    FontSize="16"
+                    FontWeight="SemiBold"
+                    Margin="0,8,0,0"
+                    IsEnabled="{Binding IsLoading, Converter={StaticResource InverseBoolConverter}}"/>
+        </StackPanel>
+
+        <!-- Footer -->
+        <StackPanel Grid.Row="2" HorizontalAlignment="Center">
+            <TextBlock Text="Default credentials: admin / Admin123!" 
+                       FontSize="12" 
+                       Foreground="#9ca3af"
+                       HorizontalAlignment="Center"/>
+        </StackPanel>
+    </Grid>
+</Window>

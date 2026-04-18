@@ -1,1 +1,0 @@
-# Industry-specific configuration modules
