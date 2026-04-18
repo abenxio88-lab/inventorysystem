@@ -8,7 +8,6 @@
     <UseWPF>true</UseWPF>
     <RootNamespace>Mintaka.UI.WPF</RootNamespace>
     <AssemblyName>MintakaInventory</AssemblyName>
-    <ApplicationIcon>..\..\docs\mintaka.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

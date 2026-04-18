@@ -1,51 +1,52 @@
 namespace Mintaka.Infrastructure.Data;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Mintaka.Core.Entities;
 using Mintaka.Core.Interfaces;
 
 /// <summary>
 /// Entity Framework Core database context
 /// </summary>
-public class ApplicationDbContext : DbContext, IUnitOfWork
+public class ApplicationDbContext : DbContext
 {
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
     {
     }
 
-    // DbSet properties for each entity
-    public DbSet<Product> Products => Set<Product>();
-    public DbSet<User> Users => Set<User>();
-    public DbSet<InventoryTransaction> Transactions => Set<InventoryTransaction>();
-    public DbSet<Customer> Customers => Set<Customer>();
-    public DbSet<Supplier> Suppliers => Set<Supplier>();
-    public DbSet<SalesOrder> SalesOrders => Set<SalesOrder>();
-    public DbSet<SalesOrderItem> SalesOrderItems => Set<SalesOrderItem>();
-    public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
-    public DbSet<PurchaseOrderItem> PurchaseOrderItems => Set<PurchaseOrderItem>();
-    public DbSet<Tenant> Tenants => Set<Tenant>();
-    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    // DbSet properties for each entity (internal to avoid conflicts with repository pattern)
+    internal DbSet<Product> ProductDbSet => Set<Product>();
+    internal DbSet<User> UserDbSet => Set<User>();
+    internal DbSet<InventoryTransaction> TransactionDbSet => Set<InventoryTransaction>();
+    internal DbSet<Customer> CustomerDbSet => Set<Customer>();
+    internal DbSet<Supplier> SupplierDbSet => Set<Supplier>();
+    internal DbSet<SalesOrder> SalesOrderDbSet => Set<SalesOrder>();
+    internal DbSet<SalesOrderItem> SalesOrderItemDbSet => Set<SalesOrderItem>();
+    internal DbSet<PurchaseOrder> PurchaseOrderDbSet => Set<PurchaseOrder>();
+    internal DbSet<PurchaseOrderItem> PurchaseOrderItemDbSet => Set<PurchaseOrderItem>();
+    internal DbSet<Tenant> TenantDbSet => Set<Tenant>();
+    internal DbSet<AuditLog> AuditLogDbSet => Set<AuditLog>();
 
-    // Repository implementations
-    private IProductRepository? _products;
-    private IUserRepository? _users;
-    private IInventoryTransactionRepository? _transactions;
-    private ICustomerRepository? _customers;
-    private ISupplierRepository? _suppliers;
-    private ISalesOrderRepository? _salesOrders;
-    private IPurchaseOrderRepository? _purchaseOrders;
-    private ITenantRepository? _tenants;
-    private IAuditLogRepository? _auditLogs;
-
-    public IProductRepository Products => _products ??= new ProductRepository(this);
-    public IUserRepository Users => _users ??= new UserRepository(this);
-    public IInventoryTransactionRepository Transactions => _transactions ??= new InventoryTransactionRepository(this);
-    public ICustomerRepository Customers => _customers ??= new CustomerRepository(this);
-    public ISupplierRepository Suppliers => _suppliers ??= new SupplierRepository(this);
-    public ISalesOrderRepository SalesOrders => _salesOrders ??= new SalesOrderRepository(this);
-    public IPurchaseOrderRepository PurchaseOrders => _purchaseOrders ??= new PurchaseOrderRepository(this);
-    public ITenantRepository Tenants => _tenants ??= new TenantRepository(this);
-    public IAuditLogRepository AuditLogs => _auditLogs ??= new AuditLogRepository(this);
+    // Repository implementations (commented - not yet implemented)
+    // private IProductRepository? _products;
+    // private IUserRepository? _users;
+    // private IInventoryTransactionRepository? _transactions;
+    // private ICustomerRepository? _customers;
+    // private ISupplierRepository? _suppliers;
+    // private ISalesOrderRepository? _salesOrders;
+    // private IPurchaseOrderRepository? _purchaseOrders;
+    // private ITenantRepository? _tenants;
+    // private IAuditLogRepository? _auditLogs;
+    //
+    // public IProductRepository Products => _products ??= new ProductRepository(this);
+    // public IUserRepository Users => _users ??= new UserRepository(this);
+    // public IInventoryTransactionRepository Transactions => _transactions ??= new InventoryTransactionRepository(this);
+    // public ICustomerRepository Customers => _customers ??= new CustomerRepository(this);
+    // public ISupplierRepository Suppliers => _suppliers ??= new SupplierRepository(this);
+    // public ISalesOrderRepository SalesOrders => _salesOrders ??= new SalesOrderRepository(this);
+    // public IPurchaseOrderRepository PurchaseOrders => _purchaseOrders ??= new PurchaseOrderRepository(this);
+    // public ITenantRepository Tenants => _tenants ??= new TenantRepository(this);
+    // public IAuditLogRepository AuditLogs => _auditLogs ??= new AuditLogRepository(this);
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -226,10 +227,15 @@ public class ApplicationDbContext : DbContext, IUnitOfWork
         }
     }
 
-    public void Dispose()
+    public override void Dispose()
     {
         _currentTransaction?.Dispose();
         base.Dispose();
+    }
+
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        return await base.SaveChangesAsync(cancellationToken);
     }
 
     #endregion

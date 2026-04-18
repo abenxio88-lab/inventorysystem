@@ -34,14 +34,14 @@ public class AuthenticationService : IAuthenticationService
             if (user == null)
             {
                 _logger.LogWarning("Login attempt for non-existent user: {Username}", username);
-                return AuthResult.Failure("Invalid username or password");
+                return AuthResult.FailureResult("Invalid username or password");
             }
 
             // Check if account is locked
             if (user.IsLocked && user.LockedUntil.HasValue && user.LockedUntil.Value > DateTime.UtcNow)
             {
                 var remainingLockout = user.LockedUntil.Value - DateTime.UtcNow;
-                return AuthResult.Failure($"Account is locked. Try again in {(int)remainingLockout.TotalMinutes} minutes.");
+                return AuthResult.FailureResult($"Account is locked. Try again in {(int)remainingLockout.TotalMinutes} minutes.");
             }
 
             // Reset lock if lockout period has expired
@@ -68,7 +68,7 @@ public class AuthenticationService : IAuthenticationService
                     await _unitOfWork.Users.UpdateAsync(user);
                     
                     _logger.LogWarning("Account locked due to multiple failed attempts: {Username}", username);
-                    return AuthResult.Failure("Too many failed attempts. Account locked for 30 minutes.");
+                    return AuthResult.FailureResult("Too many failed attempts. Account locked for 30 minutes.");
                 }
                 
                 await _unitOfWork.Users.UpdateAsync(user);
@@ -77,7 +77,7 @@ public class AuthenticationService : IAuthenticationService
                 _logger.LogWarning("Failed login attempt for user: {Username} (Attempt {Attempt})", 
                     username, user.FailedLoginAttempts);
                 
-                return AuthResult.Failure("Invalid username or password");
+                return AuthResult.FailureResult("Invalid username or password");
             }
 
             // Successful login
@@ -106,12 +106,12 @@ public class AuthenticationService : IAuthenticationService
 
             _logger.LogInformation("User logged in successfully: {Username}", username);
 
-            return AuthResult.Success(user);
+            return AuthResult.SuccessResult(user);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during login for user: {Username}", username);
-            return AuthResult.Failure("An error occurred during authentication.");
+            return AuthResult.FailureResult("An error occurred during authentication.");
         }
     }
 
@@ -124,23 +124,23 @@ public class AuthenticationService : IAuthenticationService
         {
             // Validate input
             if (string.IsNullOrWhiteSpace(username) || username.Length < 3)
-                return AuthResult.Failure("Username must be at least 3 characters.");
+                return AuthResult.FailureResult("Username must be at least 3 characters.");
 
             if (string.IsNullOrWhiteSpace(email) || !IsValidEmail(email))
-                return AuthResult.Failure("Invalid email address.");
+                return AuthResult.FailureResult("Invalid email address.");
 
             if (string.IsNullOrWhiteSpace(password) || password.Length < 8)
-                return AuthResult.Failure("Password must be at least 8 characters.");
+                return AuthResult.FailureResult("Password must be at least 8 characters.");
 
             // Check if username exists
             var usernameExists = await _unitOfWork.Users.IsUsernameTakenAsync(username, tenantId);
             if (usernameExists)
-                return AuthResult.Failure("Username already exists.");
+                return AuthResult.FailureResult("Username already exists.");
 
             // Check if email exists
             var emailExists = await _unitOfWork.Users.IsEmailTakenAsync(email, tenantId);
             if (emailExists)
-                return AuthResult.Failure("Email already registered.");
+                return AuthResult.FailureResult("Email already registered.");
 
             // Hash password
             var salt = GenerateSalt();
@@ -178,12 +178,12 @@ public class AuthenticationService : IAuthenticationService
 
             _logger.LogInformation("New user registered: {Username} ({Email})", username, email);
 
-            return AuthResult.Success(user);
+            return AuthResult.SuccessResult(user);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error registering user: {Username}", username);
-            return AuthResult.Failure("An error occurred during registration.");
+            return AuthResult.FailureResult("An error occurred during registration.");
         }
     }
 
@@ -212,7 +212,6 @@ public class AuthenticationService : IAuthenticationService
 
             user.PasswordHash = newPasswordHash;
             user.Salt = newSalt;
-            user.UpdatedAt = DateTime.UtcNow;
 
             await _unitOfWork.Users.UpdateAsync(user);
             await _unitOfWork.SaveChangesAsync();
@@ -360,8 +359,12 @@ public class AuthResult
     public string? Message { get; private set; }
     public User? User { get; private set; }
 
-    public static AuthResult Success(User user) => new() { Success = true, User = user, Message = "Login successful" };
-    public static AuthResult Failure(string message) => new() { Success = false, Message = message };
+    public static AuthResult SuccessResult(User user) => new() { Success = true, User = user, Message = "Login successful" };
+    public static AuthResult FailureResult(string message) => new() { Success = false, Message = message };
+    
+    // Backwards compatible factory methods
+    public static AuthResult SuccessFactory(User user) => SuccessResult(user);
+    public static AuthResult FailureFactory(string message) => FailureResult(message);
 }
 
 /// <summary>

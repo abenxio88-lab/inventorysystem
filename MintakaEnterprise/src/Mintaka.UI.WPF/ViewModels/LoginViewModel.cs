@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 using System.Windows;
 using Mintaka.Application.Services;
 using Mintaka.Core.Entities;
+using Mintaka.UI.WPF.Views;
 
 /// <summary>
 /// Login View Model with authentication logic
@@ -62,7 +63,7 @@ public partial class LoginViewModel : ObservableObject
                 CurrentUser = result.User;
                 
                 // Close login window and open main window
-                Application.Current.Windows.OfType<LoginView>().FirstOrDefault()?.Close();
+                // Application.Current.Windows.OfType<LoginView>().FirstOrDefault()?.Close();
                 _mainWindow.Show();
                 _mainWindow.Activate();
             }

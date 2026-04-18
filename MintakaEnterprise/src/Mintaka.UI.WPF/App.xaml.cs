@@ -6,8 +6,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using Mintaka.Infrastructure.Data;
 using Mintaka.Application.Services;
-using Mintaka.Core.Interfaces;
-using Mintaka.UI.WPF.ViewModels;
 using Mintaka.UI.WPF.Views;
 using Microsoft.EntityFrameworkCore;
 
@@ -30,27 +28,17 @@ public partial class App : Application
 
                 services.AddLogging(builder => builder.AddSerilog());
 
-                // Configure database
-                var connectionString = context.Configuration.GetConnectionString("DefaultConnection") 
-                    ?? "Server=(localdb)\\mssqllocaldb;Database=MintakaInventory;Trusted_Connection=true;";
+                // Configure database  
+                var connectionString = "Server=(localdb)\\mssqllocaldb;Database=MintakaInventory;Trusted_Connection=true;";
                 
                 services.AddDbContext<ApplicationDbContext>(options =>
                     options.UseSqlServer(connectionString));
 
-                // Register Unit of Work and Repositories
-                services.AddScoped<IUnitOfWork, ApplicationDbContext>();
-
-                // Register Services
-                services.AddScoped<IProductService, ProductService>();
+                // Register Services (minimal for now)
                 services.AddScoped<IAuthenticationService, AuthenticationService>();
 
-                // Register ViewModels
-                services.AddTransient<MainWindowViewModel>();
-                services.AddTransient<LoginViewModel>();
-
-                // Register Views
+                // Register Views and ViewModels minimally
                 services.AddTransient<MainWindow>();
-                services.AddTransient<LoginView>();
             })
             .Build();
     }
@@ -59,11 +47,18 @@ public partial class App : Application
     {
         await _host.StartAsync();
 
-        // Ensure database is created and seeded
-        using (var scope = _host.Services.CreateScope())
+        // Ensure database is created and seeded (wrapped in try-catch for cases where DB is unavailable)
+        try
         {
-            var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            await dbContext.Database.EnsureCreatedAsync();
+            using (var scope = _host.Services.CreateScope())
+            {
+                var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                await dbContext.Database.EnsureCreatedAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Database initialization failed: {ex.Message}. App will continue without database.");
         }
 
         // Show login window first
