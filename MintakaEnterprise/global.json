@@ -1,0 +1,9 @@
+# .NET SDK Version Configuration
+# This file ensures all developers use the same .NET SDK version
+
+{
+  "sdk": {
+    "version": "8.0.100",
+    "rollForward": "latestMinor"
+  }
+}

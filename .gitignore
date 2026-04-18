@@ -1,28 +1,59 @@
 ```
-# Build artifacts
-bin/
-obj/
-*.exe
-*.dll
-*.pdb
-*.userprefs
-
 # Dependencies
-packages/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+ENV/
+.venv/
+.env
+.env.local
+.env.*
+.venv/
+.ENV/
+.envrc
+
+# Build artifacts
+build/
+dist/
+*.egg
+*.egg-info/
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+*.o
+*.obj
+
+# Testing
+.coverage
+coverage/
+htmlcov/
+.pytest_cache/
+.hypothesis/
 
 # Logs
 *.log
 
-# User-specific files
-*.user
-*.suo
-*.userosscache
-*.sln.docstates
-
-# Visual Studio Code
+# Editor/IDE
 .vscode/
-
-# Temporary files
+.idea/
+*.swp
+*.swo
 *.tmp
-*.temp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python specific
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage*
+nosetests.xml
 ```

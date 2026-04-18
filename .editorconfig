@@ -1,0 +1,37 @@
+# EditorConfig - https://editorconfig.org
+# Ensures consistent coding style across editors and IDEs
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_size = 4
+indent_style = space
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.py]
+indent_size = 4
+indent_style = space
+
+[*.cs]
+indent_size = 4
+indent_style = space
+
+[*.csproj]
+indent_size = 2
+indent_style = space
+
+[*.sln]
+indent_style = tab
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.{js,ts,json,yaml,yml}]
+indent_size = 2
+indent_style = space
+
+[Makefile]
+indent_style = tab

@@ -1,25 +1,86 @@
 # Mintaka Sphere Inventory Management System
 
-## Quick Start
+[![Python CI](https://github.com/your-org/mintaka-sphere/actions/workflows/python-ci.yml/badge.svg)](https://github.com/your-org/mintaka-sphere/actions/workflows/python-ci.yml)
+[![.NET CI](https://github.com/your-org/mintaka-sphere/actions/workflows/dotnet-ci.yml/badge.svg)](https://github.com/your-org/mintaka-sphere/actions/workflows/dotnet-ci.yml)
+
+A professional inventory management system available in both Python (desktop) and .NET 8 WPF (enterprise) versions.
+
+---
+
+## 📁 Projects
+
+### 🐍 Python Desktop Application (`inventory_app/`)
+Modern Tkinter-based desktop application with SQLite database.
+
+**Quick Start:**
 ```bash
 cd inventory_app
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
 python main.py
 ```
 
-## Architecture
-```
-inventory_app/
-├── database.py    ← ALL SQL (InventoryDB class)
-├── services.py    ← Business logic (svc.inventory, svc.sales, etc.)
-├── *_ui.py        ← UI ONLY — zero SQL, reads/writes through svc.*
-└── main.py        ← Single entry point, all tabs wired
+### 🔷 .NET 8 Enterprise Application (`MintakaEnterprise/`)
+Professional WPF application built on .NET 8 with Clean Architecture.
+
+**Quick Start:**
+```bash
+cd MintakaEnterprise
+dotnet restore
+dotnet run
 ```
 
-## Features (20 tabs)
-Inventory, Sales, Locations, Suppliers, Purchase Orders, Sales Orders,
-Stock Transfers, Invoicing, Returns/RMA, Reports, Profit Analysis,
-Alerts, Smart Analytics, Industry Settings, Trade-ins, Service Tickets,
-Dashboard, Pharmacy, Electronics, Lease/Rental
+---
 
-## Tech Stack
-Python 3.14 | Tkinter/CustomTkinter | SQLite (WAL mode)
+## 🛠️ Development
+
+### Build Script (Both Projects)
+```bash
+# Linux/macOS
+./build.sh
+
+# Windows PowerShell
+.\build.ps1
+```
+
+### Code Quality Tools
+
+**Python:**
+```bash
+# Install dev dependencies
+pip install -e ".[dev]"
+
+# Lint
+ruff check .
+black --check .
+
+# Type check
+mypy inventory_app/
+
+# Test
+pytest --cov=inventory_app
+```
+
+**.NET:**
+```bash
+# Format check
+dotnet format --verify-no-changes
+
+# Test
+dotnet test
+```
+
+---
+
+## 📋 Requirements
+
+- **Python**: 3.10+ (tested on 3.10, 3.11, 3.12)
+- **.NET SDK**: 8.0+ (see `MintakaEnterprise/global.json` for exact version)
+
+---
+
+## 📄 License
+
+MIT License
+

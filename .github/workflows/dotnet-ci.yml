@@ -1,0 +1,33 @@
+name: .NET CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore MintakaEnterprise/Mintaka.sln
+
+      - name: Build
+        run: dotnet build MintakaEnterprise/Mintaka.sln --no-restore --configuration Release
+
+      - name: Format check
+        run: |
+          dotnet tool install --global dotnet-format || true
+          dotnet format --verify-no-changes MintakaEnterprise/Mintaka.sln || true
+
+      - name: Test
+        run: dotnet test MintakaEnterprise/Mintaka.sln --no-build --configuration Release --verbosity normal
