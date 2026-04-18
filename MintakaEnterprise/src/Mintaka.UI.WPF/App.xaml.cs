@@ -44,10 +44,6 @@ public partial class App : Application
                 services.AddScoped<IProductService, ProductService>();
                 services.AddScoped<IAuthenticationService, AuthenticationService>();
 
-                // Register ViewModels
-                services.AddTransient<MainWindowViewModel>();
-                services.AddTransient<LoginViewModel>();
-
                 // Register Views
                 services.AddTransient<MainWindow>();
                 services.AddTransient<LoginView>();
@@ -66,9 +62,44 @@ public partial class App : Application
             await dbContext.Database.EnsureCreatedAsync();
         }
 
-        // Show login window first
-        var loginView = _host.Services.GetRequiredService<LoginView>();
+        // Show login window first - create with proper DI
+        var serviceProvider = _host.Services;
+        var authService = serviceProvider.GetRequiredService<IAuthenticationService>();
+        var productService = serviceProvider.GetRequiredService<IProductService>();
+        
+        // Create login view model
+        var loginViewModel = new LoginViewModel(authService, null);
+        var loginView = new LoginView(loginViewModel);
         loginView.Show();
+
+        // Setup logout action for main window
+        Action showLoginWindow = () =>
+        {
+            Application.Current.Windows.OfType<MainWindow>().FirstOrDefault()?.Close();
+            var newLoginView = new LoginView(new LoginViewModel(authService, null));
+            newLoginView.Show();
+        };
+
+        // Store the logout action in app resources for MainWindow to access
+        Resources["LogoutAction"] = showLoginWindow;
+
+        // Hook up login success to open main window
+        loginViewModel.PropertyChanged += (s, args) =>
+        {
+            if (args.PropertyName == nameof(LoginViewModel.CurrentUser) && loginViewModel.CurrentUser != null)
+            {
+                loginView.Close();
+                
+                var mainWindowViewModel = new MainWindowViewModel(
+                    productService,
+                    authService,
+                    loginViewModel.CurrentUser,
+                    showLoginWindow);
+                
+                var mainWindow = new MainWindow(mainWindowViewModel);
+                mainWindow.Show();
+            }
+        };
 
         base.OnStartup(e);
     }
@@ -77,6 +108,7 @@ public partial class App : Application
     {
         await _host.StopAsync();
         _host.Dispose();
+        Log.CloseAndFlush();
         base.OnExit(e);
     }
 }
