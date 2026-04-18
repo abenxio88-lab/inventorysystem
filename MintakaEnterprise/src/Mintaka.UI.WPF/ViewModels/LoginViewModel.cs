@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 using System.Windows;
 using Mintaka.Application.Services;
 using Mintaka.Core.Entities;
+using Mintaka.UI.WPF.Views;
 
 /// <summary>
 /// Login View Model with authentication logic
@@ -12,7 +13,7 @@ using Mintaka.Core.Entities;
 public partial class LoginViewModel : ObservableObject
 {
     private readonly IAuthenticationService _authenticationService;
-    private readonly MainWindow _mainWindow;
+    private readonly Func<MainWindow>? _mainWindowFactory;
 
     [ObservableProperty]
     private string _username = string.Empty;
@@ -29,10 +30,10 @@ public partial class LoginViewModel : ObservableObject
     [ObservableProperty]
     private User? _currentUser;
 
-    public LoginViewModel(IAuthenticationService authenticationService, MainWindow mainWindow)
+    public LoginViewModel(IAuthenticationService authenticationService, Func<MainWindow>? mainWindowFactory = null)
     {
         _authenticationService = authenticationService;
-        _mainWindow = mainWindow;
+        _mainWindowFactory = mainWindowFactory;
     }
 
     [RelayCommand]
@@ -61,10 +62,17 @@ public partial class LoginViewModel : ObservableObject
             {
                 CurrentUser = result.User;
                 
-                // Close login window and open main window
-                Application.Current.Windows.OfType<LoginView>().FirstOrDefault()?.Close();
-                _mainWindow.Show();
-                _mainWindow.Activate();
+                // Close login window
+                var loginWindow = Application.Current.Windows.OfType<LoginView>().FirstOrDefault();
+                loginWindow?.Close();
+
+                // Open main window with the authenticated user
+                if (_mainWindowFactory != null)
+                {
+                    var mainWindow = _mainWindowFactory();
+                    mainWindow.Show();
+                    mainWindow.Activate();
+                }
             }
             else
             {
