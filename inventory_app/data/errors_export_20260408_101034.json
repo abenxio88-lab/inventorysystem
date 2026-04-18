@@ -1,0 +1,58 @@
+[
+  {
+    "id": "20260408101034009962",
+    "timestamp": "2026-04-08T10:10:34.009981",
+    "message": "This is an info message",
+    "severity": "info",
+    "module": "Test",
+    "function": "Unknown",
+    "user_action": "Unknown",
+    "exception_type": null,
+    "exception_message": null,
+    "traceback": null,
+    "resolved": false,
+    "resolved_at": null
+  },
+  {
+    "id": "20260408101034011154",
+    "timestamp": "2026-04-08T10:10:34.011168",
+    "message": "This is a warning",
+    "severity": "warning",
+    "module": "Test",
+    "function": "Unknown",
+    "user_action": "Unknown",
+    "exception_type": null,
+    "exception_message": null,
+    "traceback": null,
+    "resolved": false,
+    "resolved_at": null
+  },
+  {
+    "id": "20260408101034011807",
+    "timestamp": "2026-04-08T10:10:34.011817",
+    "message": "Division by zero test",
+    "severity": "error",
+    "module": "Test",
+    "function": "Unknown",
+    "user_action": "Unknown",
+    "exception_type": "ZeroDivisionError",
+    "exception_message": "division by zero",
+    "traceback": "Traceback (most recent call last):\n  File \"e:\\websites\\inventorysystem\\inventory_app\\error_manager.py\", line 519, in <module>\n    1 / 0\n    ~~^~~\nZeroDivisionError: division by zero\n",
+    "resolved": false,
+    "resolved_at": null
+  },
+  {
+    "id": "20260408101034013146",
+    "timestamp": "2026-04-08T10:10:34.013159",
+    "message": "System critical failure",
+    "severity": "critical",
+    "module": "Test",
+    "function": "Unknown",
+    "user_action": "Unknown",
+    "exception_type": "ValueError",
+    "exception_message": "Critical test error",
+    "traceback": "Traceback (most recent call last):\n  File \"e:\\websites\\inventorysystem\\inventory_app\\error_manager.py\", line 526, in <module>\n    raise ValueError(\"Critical test error\")\nValueError: Critical test error\n",
+    "resolved": false,
+    "resolved_at": null
+  }
+]

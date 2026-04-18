@@ -1,0 +1,34 @@
+[
+    {
+        "invoice_number": "INV-20260402030846",
+        "customer": "Walk-in Customer",
+        "date": "2026-04-02 03:08",
+        "items": [
+            {
+                "model": "13pro",
+                "qty": 1,
+                "rate": 8000.0,
+                "amount": 8000.0
+            }
+        ],
+        "total": 8000.0,
+        "payment_method": "Cash",
+        "status": "Completed"
+    },
+    {
+        "invoice_number": "INV-20260402030853",
+        "customer": "Walk-in Customer",
+        "date": "2026-04-02 03:08",
+        "items": [
+            {
+                "model": "16 pro max",
+                "qty": 2,
+                "rate": 10000.0,
+                "amount": 20000.0
+            }
+        ],
+        "total": 20000.0,
+        "payment_method": "Cash",
+        "status": "Completed"
+    }
+]

@@ -1,0 +1,29 @@
+{
+  "license_key": "e14f620f-fe55-4eed-8bee-991ff75a4e19",
+  "admin_email": "ali@mintaka.com",
+  "device_fingerprint": "ecd58f6c46abc601e1c692f95be546233b760cc089dcddb66eeebddfa7d64744",
+  "device_info": {
+    "hostname": "DESKTOP-B7N45PS",
+    "os": "Windows",
+    "os_version": "11",
+    "processor": "Intel64 Family 6 Model 142 Stepping 12, GenuineIntel",
+    "mac_address": "b3bf491d1289",
+    "ip_address": "172.20.10.9",
+    "fingerprint": "ecd58f6c46abc601e1c692f95be546233b760cc089dcddb66eeebddfa7d64744"
+  },
+  "licensed_date": "2026-04-01T16:30:15.419015",
+  "status": "ACTIVE",
+  "clone_detected": true,
+  "last_verified_date": "2026-04-01T16:30:15.419022",
+  "new_device_fingerprint": "1ca72727b620f1873cc58fc8bb7b8660a819d60090a0790fdb47e4be4c8c69fb",
+  "new_device_info": {
+    "hostname": "DESKTOP-B7N45PS",
+    "os": "Windows",
+    "os_version": "11",
+    "processor": "Intel64 Family 6 Model 142 Stepping 12, GenuineIntel",
+    "mac_address": "a7bebeff995c",
+    "ip_address": "172.20.10.9",
+    "fingerprint": "1ca72727b620f1873cc58fc8bb7b8660a819d60090a0790fdb47e4be4c8c69fb"
+  },
+  "clone_detected_date": "2026-04-02T22:37:35.925928"
+}

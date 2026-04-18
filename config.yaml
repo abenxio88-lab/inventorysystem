@@ -1,0 +1,37 @@
+# MS Inventory System - Configuration
+# ====================================
+# Edit these settings to customize your inventory system
+
+# Application Settings
+app_name: "MS Inventory System"
+version: "2.0.0"
+debug: false  # Set to true for development mode
+
+# Database Configuration
+database_path: ""  # Leave empty for default (~/.msinventory/data/inventory.db)
+
+# Logging
+log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+
+# Backup Settings
+backup_enabled: true
+backup_interval_hours: 24
+backup_dir: ""  # Leave empty for default (~/.msinventory/backups)
+
+# Sync Settings
+auto_sync: false  # Auto-sync with cloud backup
+
+# UI Settings
+theme: "light"  # light, dark
+language: "en"  # en, ur, ar
+
+# Business Settings
+default_tax_rate: 0.0  # Default tax rate percentage
+low_stock_threshold: 10  # Alert when stock falls to this level
+critical_stock_threshold: 5  # Critical alert threshold
+currency_symbol: "Rs."  # Currency symbol for prices
+
+# Advanced Settings
+# max_concurrent_users: 10
+# session_timeout_minutes: 60
+# enable_audit_log: true

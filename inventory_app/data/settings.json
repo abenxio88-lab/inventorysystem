@@ -1,0 +1,5 @@
+{
+    "backup_hour": 2,
+    "backup_minute": 0,
+    "backup_retention": 30
+}

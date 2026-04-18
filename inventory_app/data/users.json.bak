@@ -1,0 +1,9 @@
+{
+    "abenxio88": {
+        "hash": "pbkdf2:sha256:100000$7c63ce24a3f5c6053168e64ece42f903f2d956db533f9bd91bf0126dc070e777$81167ce3210f7e859fa2521382f2fcf5b17e8d8f7712f0b374f4650c702a6af5",
+        "salt": "",
+        "algo": "pbkdf2",
+        "role": "OWNER_ADMIN",
+        "iterations": 100000
+    }
+}

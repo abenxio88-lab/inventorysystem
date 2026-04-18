@@ -1,0 +1,33 @@
+{
+  "app": {
+    "name": "Mintaka Sphere Inventory System",
+    "version": "7.0.0",
+    "environment": "production"
+  },
+  "ui": {
+    "theme": "dark",
+    "language": "en",
+    "window_width": 1400,
+    "window_height": 900
+  },
+  "database": {
+    "path": "./data/inventory.db",
+    "backup_enabled": true,
+    "backup_interval_hours": 24
+  },
+  "sync": {
+    "enabled": false,
+    "mode": "local",
+    "network_port": 8765
+  },
+  "industry": {
+    "type": "general_retail",
+    "features": []
+  },
+  "features": {
+    "barcode_scanning": false,
+    "ai_insights": false,
+    "cloud_sync": false
+  },
+  "last_updated": "2026-04-02T23:30:49.684159"
+}
