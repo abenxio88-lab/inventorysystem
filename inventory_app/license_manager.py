@@ -21,6 +21,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Tuple, Dict
 import platform
 import socket
+import base64
 
 try:
     from .database import get_db_cursor, get_connection
@@ -28,6 +29,41 @@ try:
 except (ImportError, ModuleNotFoundError):
     from database import get_db_cursor, get_connection
     from utils import get_data_dir
+
+
+# ============================================================================
+# LICENSE ENCRYPTION UTILITIES
+# ============================================================================
+
+def _get_encryption_key() -> bytes:
+    """Derive encryption key from device fingerprint."""
+    fingerprint = get_device_fingerprint()
+    # Use SHA-256 of fingerprint as encryption key
+    return hashlib.sha256(fingerprint.encode()).digest()
+
+
+def _encrypt_license_data(data: dict) -> str:
+    """Encrypt license data using XOR cipher with device fingerprint."""
+    json_data = json.dumps(data, indent=2).encode('utf-8')
+    key = _get_encryption_key()
+    
+    # XOR encryption (simple but effective for license files)
+    encrypted = bytes([json_data[i] ^ key[i % len(key)] for i in range(len(json_data))])
+    return base64.b64encode(encrypted).decode('utf-8')
+
+
+def _decrypt_license_data(encrypted_data: str) -> dict:
+    """Decrypt license data."""
+    try:
+        encrypted_bytes = base64.b64decode(encrypted_data.encode('utf-8'))
+        key = _get_encryption_key()
+        
+        # XOR decryption
+        decrypted = bytes([encrypted_bytes[i] ^ key[i % len(key)] for i in range(len(encrypted_bytes))])
+        return json.loads(decrypted.decode('utf-8'))
+    except Exception as e:
+        logging.error(f"License decryption failed: {e}")
+        raise ValueError("Invalid or corrupted license file")
 
 
 # ============================================================================
@@ -104,7 +140,7 @@ class LicenseManager:
     
     @staticmethod
     def initialize_license(admin_email: str) -> str:
-        """Initialize software license on first launch."""
+        """Initialize software license on first launch with encryption."""
         device_info = get_device_info()
         
         license_data = {
@@ -118,8 +154,14 @@ class LicenseManager:
             'last_verified_date': datetime.now().isoformat()
         }
         
+        # Encrypt and save license file
+        encrypted_license = _encrypt_license_data(license_data)
         with open(LicenseManager.LICENSE_FILE, 'w') as f:
-            json.dump(license_data, f, indent=2)
+            json.dump({
+                'version': 2,
+                'encrypted_data': encrypted_license,
+                'created_at': datetime.now().isoformat()
+            }, f, indent=2)
         
         with get_db_cursor() as cur:
             cur.execute("""
@@ -144,7 +186,7 @@ class LicenseManager:
                 datetime.now().isoformat()
             ))
         
-        logging.info(f"Software licensed to: {admin_email}")
+        logging.info(f"Software licensed to: {admin_email} (encrypted)")
         return license_data['license_key']
     
     @staticmethod
@@ -155,7 +197,16 @@ class LicenseManager:
         
         try:
             with open(LicenseManager.LICENSE_FILE, 'r') as f:
-                license_data = json.load(f)
+                license_file = json.load(f)
+            
+            # Support both v1 (plain JSON) and v2 (encrypted) formats
+            if license_file.get('version') == 2:
+                license_data = _decrypt_license_data(license_file['encrypted_data'])
+            else:
+                # Legacy format - plain JSON (will be upgraded on next verification)
+                license_data = license_file
+        except ValueError as e:
+            return False, f"INVALID_LICENSE: {str(e)}"
         except Exception as e:
             return False, f"INVALID_LICENSE: {str(e)}"
         
@@ -171,11 +222,30 @@ class LicenseManager:
             license_data['new_device_info'] = get_device_info()
             license_data['clone_detected_date'] = datetime.now().isoformat()
             
+            # Re-encrypt and save with clone detection
+            encrypted_license = _encrypt_license_data(license_data)
             with open(LicenseManager.LICENSE_FILE, 'w') as f:
-                json.dump(license_data, f, indent=2)
+                json.dump({
+                    'version': 2,
+                    'encrypted_data': encrypted_license,
+                    'created_at': license_file.get('created_at', datetime.now().isoformat()),
+                    'last_modified': datetime.now().isoformat()
+                }, f, indent=2)
             
             logging.warning("CLONE DETECTED: Software running on unauthorized device")
             return False, "CLONE_DETECTED"
+
+        # Upgrade legacy license to encrypted format
+        if license_file.get('version') != 2:
+            encrypted_license = _encrypt_license_data(license_data)
+            with open(LicenseManager.LICENSE_FILE, 'w') as f:
+                json.dump({
+                    'version': 2,
+                    'encrypted_data': encrypted_license,
+                    'created_at': license_file.get('licensed_date', datetime.now().isoformat()),
+                    'upgraded_at': datetime.now().isoformat()
+                }, f, indent=2)
+            logging.info("License upgraded to encrypted format")
 
         return True, "VALID"
     
@@ -187,7 +257,13 @@ class LicenseManager:
         
         try:
             with open(LicenseManager.LICENSE_FILE, 'r') as f:
-                license_data = json.load(f)
+                license_file = json.load(f)
+            
+            # Handle encrypted v2 format
+            if license_file.get('version') == 2:
+                license_data = _decrypt_license_data(license_file['encrypted_data'])
+            else:
+                license_data = license_file
             
             # Update fingerprint
             current_fingerprint = get_device_fingerprint()
@@ -195,8 +271,15 @@ class LicenseManager:
             license_data['device_info'] = get_device_info()
             license_data['clone_detected'] = False
             
+            # Re-encrypt and save
+            encrypted_license = _encrypt_license_data(license_data)
             with open(LicenseManager.LICENSE_FILE, 'w') as f:
-                json.dump(license_data, f, indent=2)
+                json.dump({
+                    'version': 2,
+                    'encrypted_data': encrypted_license,
+                    'created_at': license_file.get('created_at', datetime.now().isoformat()),
+                    'last_modified': datetime.now().isoformat()
+                }, f, indent=2)
             
             logging.info("Device fingerprint updated")
         except Exception as e:
@@ -204,13 +287,29 @@ class LicenseManager:
     
     @staticmethod
     def get_license_info() -> Optional[Dict]:
-        """Get current license information."""
+        """Get current license information (decrypted if v2)."""
         if not os.path.exists(LicenseManager.LICENSE_FILE):
             return None
         
         try:
             with open(LicenseManager.LICENSE_FILE, 'r') as f:
-                return json.load(f)
+                license_file = json.load(f)
+            
+            # Return decrypted data for v2 licenses
+            if license_file.get('version') == 2:
+                try:
+                    license_data = _decrypt_license_data(license_file['encrypted_data'])
+                    # Add metadata
+                    license_data['version'] = 2
+                    license_data['created_at'] = license_file.get('created_at')
+                    license_data['last_modified'] = license_file.get('last_modified')
+                    return license_data
+                except ValueError:
+                    logging.error("Cannot decrypt license file")
+                    return None
+            else:
+                # Legacy format
+                return license_file
         except Exception as e:
             logging.error(f"Error reading license info: {e}")
             return None

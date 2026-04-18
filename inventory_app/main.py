@@ -373,7 +373,12 @@ class MintakaSphereApp:
                 except Exception as exc:
                     logging.warning("User migration failed: %s", exc)
 
-                # 3. Create main window
+                # 3. Check if first-run wizard is needed
+                f.write("Checking first-run status...\n")
+                f.flush()
+                show_wizard = self._check_first_run()
+                
+                # 4. Create main window
                 f.write("Creating main window...\n")
                 f.flush()
                 self.main_window = QtWidgets.QMainWindow()
@@ -389,14 +394,20 @@ class MintakaSphereApp:
                 f.write("Theme setup done\n")
                 f.flush()
 
-                # 4. Show login
+                # 5. Show startup wizard if first run
+                if show_wizard:
+                    f.write("Showing startup wizard...\n")
+                    f.flush()
+                    self._show_startup_wizard()
+                
+                # 6. Show login
                 f.write("Showing login dialog...\n")
                 f.flush()
                 self._show_login()
                 f.write("Login dialog shown\n")
                 f.flush()
 
-                # 5. Start event loop
+                # 7. Start event loop
                 f.write("Starting event loop...\n")
                 f.flush()
                 sys.exit(self.app.exec())
@@ -423,6 +434,43 @@ class MintakaSphereApp:
 
         # Show PySide6 login dialog (NO parent = always visible on top)
         open_login(on_success=on_login_success, parent=None)
+
+    def _check_first_run(self) -> bool:
+        """Check if this is first run (no company configured)."""
+        try:
+            from database import db, get_db_cursor
+            # Check if company settings exist
+            cur = get_db_cursor()
+            cur.execute("SELECT COUNT(*) FROM business_settings")
+            count = cur.fetchone()[0]
+            return count == 0
+        except Exception:
+            # If table doesn't exist yet, assume first run
+            return True
+
+    def _show_startup_wizard(self):
+        """Show the startup wizard for first-time setup."""
+        try:
+            from startup_wizard import create_startup_wizard
+            
+            def on_wizard_complete():
+                report_info("Startup wizard completed - company configured", module="Main")
+            
+            # Create modal wizard dialog
+            wizard_dialog = QtWidgets.QDialog(self.main_window)
+            wizard_dialog.setWindowTitle("Welcome to Mintaka Sphere")
+            wizard_dialog.setModal(True)
+            wizard_dialog.setMinimumSize(700, 550)
+            
+            # Build wizard UI
+            wizard_content = create_startup_wizard(wizard_dialog, on_wizard_complete)
+            if wizard_content:
+                layout = QtWidgets.QVBoxLayout(wizard_dialog)
+                layout.addWidget(wizard_content)
+                wizard_dialog.exec()
+        except Exception as exc:
+            logging.warning(f"Failed to show startup wizard: {exc}")
+            # Continue anyway - wizard is optional
 
     def _on_login_success(self, username, role, user_id):
         """Handle successful login and build dashboard."""
